@@ -1,3 +1,4 @@
+import os
 from downloader import download
 from zipper import unzip
 
@@ -43,5 +44,29 @@ def download_unzip_save(url: str, save_path: str) -> None:
     with open(save_path, 'wb') as f:
         f.write(contents)
         
+def download_unzip_save_many(urls: list[str], save_paths: list[str]) -> None:
+    """
+    Download multiple zip files from URLs, unzip them, and save contents to files.
+    
+    Args:
+        urls: List of URLs of zip files to download
+        save_paths: List of paths where the unzipped files should be saved
+        
+    Raises:
+        ValueError: If urls and save_paths have different lengths
+        requests.exceptions.RequestException: If any download fails
+        ValueError: If any downloaded file is not a valid zip
+        zipfile.BadZipFile: If any zip file is corrupted or invalid
+        OSError: If there are issues writing any output file
+    """
+    if len(urls) != len(save_paths):
+        raise ValueError("Number of URLs must match number of save paths")
+        
+    for url, save_path in zip(urls, save_paths):
+        download_unzip_save(url, save_path)
+
+        
 if __name__ == "__main__":
-    download_unzip_save("https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-11-19.zip", "BTCUSDT-aggTrades-2024-11-19.csv")
+    # Create directory if it doesn't exist
+    os.makedirs("/Users/dingwendi/test/aaa", exist_ok=True)
+    download_unzip_save("https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-11-19.zip", "/Users/dingwendi/test/aaa/BTCUSDT-aggTrades-2024-11-19.csv")
