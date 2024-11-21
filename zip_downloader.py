@@ -1,72 +1,40 @@
 import os
 from downloader import download
-from zipper import unzip
+from zipper import is_valid_zip, unzip
+import config
 
-def download_unzip(url: str) -> bytes:
+def zip_download_verify_save(url: str, save_dir: str) -> None:
     """
-    Download a zip file from URL, validate it, and return unzipped contents.
+    Download a zip file from URL, validate it, and save contents to file.
     
     Args:
         url: URL of the zip file to download
-        
-    Returns:
-        The unzipped file contents as bytes
-        
+        save_path: Path where the zip file should be saved
+
     Raises:
         requests.exceptions.RequestException: If download fails
         ValueError: If downloaded file is not a valid zip
         zipfile.BadZipFile: If zip file is corrupted or invalid
     """
     # Download the file
-    _, data = download(url)
-        
-    # Unzip and return contents
-    return unzip(data)
+    data = download(url)
+    
+    if not is_valid_zip(data):
+        raise ValueError("Downloaded file is not a valid zip")
+    
+    os.makedirs(save_dir, exist_ok=True)
 
-def download_unzip_save(url: str, save_path: str) -> None:
-    """
-    Download a zip file from URL, unzip it, and save contents to file.
-    
-    Args:
-        url: URL of the zip file to download
-        save_path: Path where the unzipped file should be saved
+    filename = url.split('/')[-1]
+
+    save_path = os.path.join(save_dir, filename)
         
-    Raises:
-        requests.exceptions.RequestException: If download fails
-        ValueError: If downloaded file is not a valid zip
-        zipfile.BadZipFile: If zip file is corrupted or invalid
-        OSError: If there are issues writing the output file
-    """
-    # Download and unzip
-    contents = download_unzip(url)
-    
     # Save to file
     with open(save_path, 'wb') as f:
-        f.write(contents)
+        f.write(data)
         
-def download_unzip_save_many(urls: list[str], save_paths: list[str]) -> None:
-    """
-    Download multiple zip files from URLs, unzip them, and save contents to files.
-    
-    Args:
-        urls: List of URLs of zip files to download
-        save_paths: List of paths where the unzipped files should be saved
-        
-    Raises:
-        ValueError: If urls and save_paths have different lengths
-        requests.exceptions.RequestException: If any download fails
-        ValueError: If any downloaded file is not a valid zip
-        zipfile.BadZipFile: If any zip file is corrupted or invalid
-        OSError: If there are issues writing any output file
-    """
-    if len(urls) != len(save_paths):
-        raise ValueError("Number of URLs must match number of save paths")
-        
-    for url, save_path in zip(urls, save_paths):
-        download_unzip_save(url, save_path)
-
         
 if __name__ == "__main__":
-    # Create directory if it doesn't exist
-    os.makedirs("/Users/dingwendi/test/aaa", exist_ok=True)
-    download_unzip_save("https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-11-19.zip", "/Users/dingwendi/test/aaa/BTCUSDT-aggTrades-2024-11-19.csv")
+    prefix = "data/spot/daily/aggTrades/BTCUSDT"
+    url = f"https://data.binance.vision/{prefix}/BTCUSDT-aggTrades-2024-11-19.zip"
+    save_dir = config.data_binance_vision_dir + "/" + prefix
+    zip_download_verify_save(url, save_dir)

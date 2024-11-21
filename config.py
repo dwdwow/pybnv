@@ -1,3 +1,5 @@
+import os
+
 # 因为binance数据集很大，所以需要一个工作目录来存储下载的文件
 # 工作目录下的data.binance.vision目录下存储原始数据
 # unzip.binance.vision目录下存储解压缩后的数据
@@ -9,9 +11,17 @@
 # 如果work_dir为～，则存储在用户目录
 # 除此之外，work_dir为绝对路径
 
-# 一般情况下原始zip数据直接解压，不需要存储
+# 一个文件的完整路径为 根目录+prefix+filename
+# 例如：https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-11-19.zip
+# 此url的根目录为https://data.binance.vision/
+# prefix为data/spot/daily/aggTrades/BTCUSDT
+# filename为BTCUSDT-aggTrades-2024-11-19.zip
+# 下载时，save_path为data_binance_vision_dir+prefix+filename(zip)
+# 解压时，save_path为unzip_binance_vision_dir+prefix+filename(csv)
+# 缺失时，save_path为missing_binance_vision_dir+prefix+filename(csv)
+# 整理时，save_path为tidy_binance_vision_dir+prefix+filename(csv)
+# 这样做，可以保持文件的层次结构一样，便于管理
 
-import os
 
 work_dir = "~"
 
@@ -27,3 +37,11 @@ unzip_binance_vision_dir = os.path.join(work_dir, "unzip.binance.vision")
 missing_binance_vision_dir = os.path.join(work_dir, "missing.binance.vision")
 tidy_binance_vision_dir = os.path.join(work_dir, "tidy.binance.vision")
 diy_binance_vision_dir = os.path.join(work_dir, "diy.binance.vision")
+
+
+# 需要多核下载
+max_workers = 1
+
+if os.cpu_count() > 1:
+    # 使用2/3的核数
+    max_workers = os.cpu_count() * 2 // 3

@@ -1,3 +1,4 @@
 *.zip
 *.csv
 __pycache__/
+just_test.py
