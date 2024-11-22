@@ -3,8 +3,8 @@ import os, requests, logging, config
 from urllib.parse import urlparse
 from typing import Callable
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
 def download(url: str) -> bytes:
     try:
@@ -115,7 +115,8 @@ def multi_thread_download_save_many(
     undownloaded_urls = []
     
     with Pool(processes=config.max_workers) as pool:
-        undownloaded_urls = pool.map(sync_download_save_many, url_chunks, save_dir, data_checker)
+        args = [(url_chunk, save_dir, data_checker) for url_chunk in url_chunks]
+        undownloaded_urls = pool.map(sync_download_save_many, args)
             
     return undownloaded_urls
 
