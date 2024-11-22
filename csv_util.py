@@ -10,6 +10,7 @@ _logger = logging.getLogger(__name__)
 
 klines_headers = ["openTime", "openPrice", "highPrice", "lowPrice", "closePrice", "volume", "closeTime", "quoteAssetVolume", "tradesNumber", "takerBuyBaseAssetVolume", "takerBuyQuoteAssetVolume", "unused"]
 agg_trades_headers = ["id", "price", "qty", "firstTradeId", "lastTradeId", "time", "isBuyerMaker", "isBestMatch"]
+agg_trades_api_data_headers = ["a", "p", "q", "f", "l", "T", "m", "M"]
 
 def has_header(file: TextIO) -> bool:
     """
@@ -44,12 +45,13 @@ def has_header(file: TextIO) -> bool:
 
 def csv_to_pandas(file: TextIO, headers: list[str]) -> pd.DataFrame:
     has_h = has_header(file)
+    frame = None
     if has_h:
-        return pd.read_csv(file)
+        frame = pd.read_csv(file)
     else:
         frame = pd.read_csv(file, header=None)
-        frame.columns = headers.copy()
-        return frame
+    frame.columns = headers.copy()
+    return frame
 
 
 if __name__ == "__main__":
