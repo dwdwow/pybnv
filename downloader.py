@@ -1,9 +1,7 @@
 from multiprocessing import Pool
-import os
-import requests
-import logging
-
-import config
+import os, requests, logging, config
+from urllib.parse import urlparse
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,20 +22,54 @@ def download(url: str) -> bytes:
     except requests.exceptions.RequestException as e:
         raise e
     
-def download_save(url: str, save_path: str, check_exists: bool = True) -> None:
+
+def download_save(
+        url: str,
+        save_dir: str,
+        data_checker: Callable[[bytes], bool] = lambda _: True,
+        check_exists: bool = True
+    ) -> None:
+    """Downloads a file from a URL and saves it to a specified path.
+
+    Args:
+        url: URL to download from
+        save_path: File path to save the downloaded file to
+        data_checker: Optional function to validate downloaded data. Takes bytes as input and returns bool.
+                     Defaults to always returning True.
+        check_exists: If True, skip download if file already exists at save_path. Defaults to True.
+
+    Raises:
+        requests.exceptions.RequestException: If download fails
+        ValueError: If downloaded data fails validation check
+    """
+    parsed_url = urlparse(url)
+    filename = parsed_url.path.split('/')[-1]
+    save_path = os.path.join(save_dir, filename)
+    
     if check_exists and os.path.exists(save_path):
         return
     
     data = download(url)
+
+    if not data_checker(data):
+        raise ValueError(f"Downloaded data is not valid")
+    
     with open(save_path, 'wb') as f:
         f.write(data)
         
-def sync_download_save_many(urls: list[str], save_paths: list[str]) -> list[str]:
+
+def sync_download_save_many(
+        urls: list[str],
+        save_dir: str,
+        data_checker: Callable[[bytes], bool] = lambda _: True
+    ) -> list[str]:
     """Downloads multiple files from URLs and saves them to specified paths.
 
     Args:
         urls: List of URLs to download from
-        save_paths: List of file paths to save the downloaded files to
+        save_dir: Directory to save the downloaded files to
+        data_checker: Optional function to validate downloaded data. Takes bytes as input and returns bool.
+                     Defaults to always returning True.
         
     Returns:
         List of URLs that failed to download
@@ -45,16 +77,13 @@ def sync_download_save_many(urls: list[str], save_paths: list[str]) -> list[str]
     Raises:
         ValueError: If urls and save_paths have different lengths
     """
-    if len(urls) != len(save_paths):
-        raise ValueError("urls and save_paths must have the same length")
-    
     undownloaded_urls = []
 
-    for url, save_path in zip(urls, save_paths):
+    for url in urls:
         filename = url.split('/')[-1]
         try:
             logger.info(f"Downloading {filename}")
-            download_save(url, save_path)
+            download_save(url, save_dir, data_checker)
             logger.info(f"Downloaded {filename}")
         except Exception as e:
             logger.error(f"Failed to download {filename}: {e}")
@@ -62,33 +91,43 @@ def sync_download_save_many(urls: list[str], save_paths: list[str]) -> list[str]
             
     return undownloaded_urls
 
-def multi_thread_download_save_many(urls: list[str], save_paths: list[str]) -> list[str]:
+
+def multi_thread_download_save_many(
+        urls: list[str],
+        save_dir: str,
+        data_checker: Callable[[bytes], bool] = lambda _: True,
+    ) -> list[str]:
     """Downloads multiple files from URLs and saves them to specified paths using multiple threads.
 
     Args:
         urls: List of URLs to download from
-        save_paths: List of file paths to save the downloaded files to
+        save_dir: Directory to save the downloaded files to
+        data_checker: Optional function to validate downloaded data. Takes bytes as input and returns bool.
+                     Defaults to always returning True.
         
     Returns:
         List of URLs that failed to download
         
-    Raises:
-        ValueError: If urls and save_paths have different lengths
     """
-    if len(urls) != len(save_paths):
-        raise ValueError("urls and save_paths must have the same length")
-
     # Group URLs and save paths into chunks based on max_workers
     url_chunks = [urls[i:i + config.max_workers] for i in range(0, len(urls), config.max_workers)]
-    save_path_chunks = [save_paths[i:i + config.max_workers] for i in range(0, len(save_paths), config.max_workers)]
 
     undownloaded_urls = []
     
     with Pool(processes=config.max_workers) as pool:
-        chunks = zip(url_chunks, save_path_chunks)
-        undownloaded_urls = pool.map(sync_download_save_many, chunks)
+        undownloaded_urls = pool.map(sync_download_save_many, url_chunks, save_dir, data_checker)
             
     return undownloaded_urls
+
+
+def multi_thread_download_save_many_until_success(
+        urls: list[str],
+        save_dir: str,
+        data_checker: Callable[[bytes], bool] = lambda _: True,
+    ) -> None:
+    undownloaded_urls = multi_thread_download_save_many(urls, save_dir, data_checker)
+    while undownloaded_urls:
+        undownloaded_urls = multi_thread_download_save_many(undownloaded_urls, save_dir, data_checker)
 
 
 if __name__ == "__main__":

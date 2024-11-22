@@ -16,11 +16,7 @@ def query_vision_xml_file_paths(prefix: str, marker: str = '') -> List[str]:
     Returns:
         List of file paths
     """
-    # Remove leading slash if present
-    prefix = prefix.lstrip('/')
-    # Remove trailing slash if present
-    prefix = prefix.rstrip('/')
-    prefix += '/'
+    prefix = prefix.strip('/') + "/"
     url = f"https://s3-ap-northeast-1.amazonaws.com/data.binance.vision?delimiter=/&prefix={prefix}&marker={marker}"
     response = requests.get(url)
     response.raise_for_status()
