@@ -80,3 +80,7 @@ def is_valid_zip_file(file_path: str) -> bool:
     except (zipfile.BadZipFile, FileNotFoundError):
         return False
 
+
+def unzip_file_to_dir(file_path: str, save_dir: str) -> None:
+    with zipfile.ZipFile(file_path, 'r') as zip_ref:
+        zip_ref.extractall(save_dir)
