@@ -1,4 +1,8 @@
+import logging
 import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 因为binance数据集很大，所以需要一个工作目录来存储下载的文件
 # 工作目录下的data.binance.vision目录下存储原始数据
@@ -31,6 +35,8 @@ if work_dir == "~":
 if work_dir != "" and not work_dir.startswith("/"):
     raise ValueError("work_dir must be an absolute path")
 
+logger.debug(f"Work dir: {work_dir}")
+
 # 一般不要修改以下目录
 data_binance_vision_dir = os.path.join(work_dir, "data.binance.vision")
 unzip_binance_vision_dir = os.path.join(work_dir, "unzip.binance.vision")
@@ -45,3 +51,5 @@ max_workers = 1
 if os.cpu_count() > 1:
     # 使用2/3的核数
     max_workers = os.cpu_count() * 2 // 3
+
+logger.debug(f"Max workers: {max_workers}")

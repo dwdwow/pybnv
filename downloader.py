@@ -49,6 +49,8 @@ def download_save(
     if check_exists and os.path.exists(save_path):
         return
     
+    os.makedirs(save_dir, exist_ok=True)
+    
     data = download(url)
 
     if not data_checker(data):
@@ -58,7 +60,7 @@ def download_save(
         f.write(data)
         
 
-def sync_download_save_many(
+def download_save_many(
         urls: list[str],
         save_dir: str,
         data_checker: Callable[[bytes], bool] = lambda _: True
@@ -82,9 +84,7 @@ def sync_download_save_many(
     for url in urls:
         filename = url.split('/')[-1]
         try:
-            logger.info(f"Downloading {filename}")
             download_save(url, save_dir, data_checker)
-            logger.info(f"Downloaded {filename}")
         except Exception as e:
             logger.error(f"Failed to download {filename}: {e}")
             undownloaded_urls.append(url)
@@ -92,12 +92,14 @@ def sync_download_save_many(
     return undownloaded_urls
 
 
-def multi_thread_download_save_many(
+def multi_proc_download_save_many(
         urls: list[str],
         save_dir: str,
         data_checker: Callable[[bytes], bool] = lambda _: True,
     ) -> list[str]:
-    """Downloads multiple files from URLs and saves them to specified paths using multiple threads.
+    """Downloads multiple files from URLs and saves them to specified paths using multiple processes.
+    
+    Max process number is config.max_workers
 
     Args:
         urls: List of URLs to download from
@@ -109,29 +111,33 @@ def multi_thread_download_save_many(
         List of URLs that failed to download
         
     """
-    # Group URLs and save paths into chunks based on max_workers
-    url_chunks = [urls[i:i + config.max_workers] for i in range(0, len(urls), config.max_workers)]
+    group_num = len(urls) // config.max_workers + 1
+    url_chunks = [urls[i:i + group_num] for i in range(0, len(urls), group_num)]
 
     undownloaded_urls = []
     
     with Pool(processes=config.max_workers) as pool:
         args = [(url_chunk, save_dir, data_checker) for url_chunk in url_chunks]
-        undownloaded_urls = pool.map(sync_download_save_many, args)
+        undownloads = pool.starmap(download_save_many, args)
+        for chunk in undownloads:
+            undownloaded_urls.extend(chunk)
             
     return undownloaded_urls
 
 
-def multi_thread_download_save_many_until_success(
+def multi_proc_download_save_many_until_success(
         urls: list[str],
         save_dir: str,
         data_checker: Callable[[bytes], bool] = lambda _: True,
     ) -> None:
-    undownloaded_urls = multi_thread_download_save_many(urls, save_dir, data_checker)
+    undownloaded_urls = urls
     while undownloaded_urls:
-        undownloaded_urls = multi_thread_download_save_many(undownloaded_urls, save_dir, data_checker)
+        undownloaded_urls = multi_proc_download_save_many(undownloaded_urls, save_dir, data_checker)
 
 
 if __name__ == "__main__":
     # Just for testing
-    data = download("https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-11-19.zip")
-    print(len(data))
+    urls = ["https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2024-11-19.zip"]
+    save_dir = config.data_binance_vision_dir + "/data/spot/daily/aggTrades/BTCUSDT/"
+    undownloaded_urls = download_save_many(urls, save_dir)
+    print(undownloaded_urls)

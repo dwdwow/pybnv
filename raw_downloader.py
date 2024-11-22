@@ -1,5 +1,5 @@
 import logging
-from downloader import multi_thread_download_save_many_until_success
+from downloader import multi_proc_download_save_many_until_success
 from xmler import query_vision_xml_file_paths
 from zipper import is_valid_zip 
 import config
@@ -10,10 +10,11 @@ logger = logging.getLogger(__name__)
 def download(prefix: str, market: str, save_dir: str) -> None:
     logger.info(f"Downloading {prefix} {market} XML, And Getting File Paths")
     file_paths = query_vision_xml_file_paths(prefix, market)
+    file_paths = [path for path in file_paths if path.endswith('.zip')]
     logger.info(f"Found {len(file_paths)} files")
     urls = [f"https://data.binance.vision/{file_path.strip("/")}" for file_path in file_paths]
     logger.info(f"Downloading {prefix} {market} Files")
-    multi_thread_download_save_many_until_success(urls, save_dir, is_valid_zip)
+    multi_proc_download_save_many_until_success(urls, save_dir, is_valid_zip)
     logger.info(f"Downloaded {prefix} {market} Files")
         
         
