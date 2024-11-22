@@ -41,6 +41,10 @@ def unzip_file(file_path: str) -> bytes:
         # Extract and return the contents
         return zip_ref.read(first_file)
 
+def unzip_file_save(file_path: str, save_path: str) -> None:
+    data = unzip_file(file_path)
+    with open(save_path, 'wb') as f:
+        f.write(data)
 
 def is_valid_zip(data: bytes) -> bool:
     """
@@ -79,8 +83,3 @@ def is_valid_zip_file(file_path: str) -> bool:
             return True
     except (zipfile.BadZipFile, FileNotFoundError):
         return False
-
-
-def unzip_file_to_dir(file_path: str, save_dir: str) -> None:
-    with zipfile.ZipFile(file_path, 'r') as zip_ref:
-        zip_ref.extractall(save_dir)
