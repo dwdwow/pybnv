@@ -96,6 +96,7 @@ def multi_proc_download_save_many(
         urls: list[str],
         save_dir: str,
         data_checker: Callable[[bytes], bool] = lambda _: True,
+        max_workers: int = config.max_workers
     ) -> list[str]:
     """Downloads multiple files from URLs and saves them to specified paths using multiple processes.
     
@@ -116,7 +117,7 @@ def multi_proc_download_save_many(
 
     undownloaded_urls = []
     
-    with Pool(processes=config.max_workers) as pool:
+    with Pool(processes=max_workers) as pool:
         args = [(url_chunk, save_dir, data_checker) for url_chunk in url_chunks]
         undownloads = pool.starmap(download_save_many, args)
         for chunk in undownloads:
@@ -129,10 +130,11 @@ def multi_proc_download_save_many_until_success(
         urls: list[str],
         save_dir: str,
         data_checker: Callable[[bytes], bool] = lambda _: True,
+        max_workers: int = config.max_workers
     ) -> None:
     undownloaded_urls = urls
     while undownloaded_urls:
-        undownloaded_urls = multi_proc_download_save_many(undownloaded_urls, save_dir, data_checker)
+        undownloaded_urls = multi_proc_download_save_many(undownloaded_urls, save_dir, data_checker, max_workers)
 
 
 if __name__ == "__main__":

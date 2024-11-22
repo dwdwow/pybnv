@@ -9,8 +9,7 @@ import config
 _logger = logging.getLogger(__name__)
 
 klines_headers = ["openTime", "openPrice", "highPrice", "lowPrice", "closePrice", "volume", "closeTime", "quoteAssetVolume", "tradesNumber", "takerBuyBaseAssetVolume", "takerBuyQuoteAssetVolume", "unused"]
-futures_agg_trades_headers = ["id", "price", "qty", "firstTradeId", "lastTradeId", "time", "isBuyerMaker", "isBestMatch"]
-spot_agg_trades_headers = ["id", "price", "qty", "firstTradeId", "lastTradeId", "time", "isBuyerMaker"]
+agg_trades_headers = ["id", "price", "qty", "firstTradeId", "lastTradeId", "time", "isBuyerMaker", "isBestMatch"]
 
 def has_header(file: TextIO) -> bool:
     """

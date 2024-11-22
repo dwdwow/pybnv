@@ -19,6 +19,6 @@ def download(prefix: str, market: str, save_dir: str) -> None:
         
         
 if __name__ == "__main__":
-    prefix = "data/spot/monthly/klines/PEPEUSDT/1w"
+    prefix = "data/spot/daily/aggTrades/PEPEUSDT"
     save_dir = config.data_binance_vision_dir + "/" + prefix
     download(prefix, "", save_dir)
