@@ -1,10 +1,13 @@
 from enum import Enum
+import logging
 import os
 import agg_trades_checker
 import config
 from enums import SymbolType
 import raw_downloader
 import raw_unzipper
+
+_logger = logging.getLogger(__name__)
 
 def tidy_one_symbol(
         syb_type: SymbolType,
@@ -27,8 +30,13 @@ def tidy_one_symbol(
         file_names.sort()
         last_file_name = file_names[-1]
     
-    missing_ids = agg_trades_checker.multi_proc_check_one_dir_consistency(unzip_dir, ["id"], start_file_name=last_file_name)
+    missing_ids = agg_trades_checker.multi_proc_check_one_dir_consistency(unzip_dir, config.agg_trades_headers, start_file_name=last_file_name)
     
     agg_trades_checker.download_missing_trades_and_save(syb_type, symbol, missing_ids, missing_dir)
     
     agg_trades_checker.multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type, symbol)
+    
+    missing_ids = agg_trades_checker.multi_proc_check_one_dir_consistency(tidy_dir, config.agg_trades_headers, start_file_name=last_file_name)
+    
+    if missing_ids:
+        _logger.error(f"Missing trades found for {symbol} in {tidy_dir}")
