@@ -5,9 +5,10 @@ from multiprocessing import Pool
 import os
 import pandas as pd
 
-from api_downloader import download_spot_agg_trades_by_ids
+import api_downloader
 import config
 import csv_util
+from enums import SymbolType
 
 
 logging.basicConfig(level=logging.INFO)
@@ -107,11 +108,19 @@ def group_missing_ids(missing_ids: list[int]) -> list[list[int]]:
     return groups
 
 
-def download_missing_trades(symbol: str, missing_ids: list[int]) -> list[dict]:
+def download_missing_trades(syb_type: SymbolType, symbol: str, missing_ids: list[int]) -> list[dict]:
     grouped_missing_ids = group_missing_ids(missing_ids)
     trades = []
+    f = None
+    match syb_type:
+        case SymbolType.SPOT:
+            f = api_downloader.download_spot_agg_trades_by_ids
+        case SymbolType.FUTURES_UM:
+            f = api_downloader.download_futures_um_agg_trades_by_ids
+        case SymbolType.FUTURES_CM:
+            f = api_downloader.download_futures_cm_agg_trades_by_ids
     for group in grouped_missing_ids:
-        trades.extend(download_spot_agg_trades_by_ids(symbol, group[0], group[-1]))
+        trades.extend(f(symbol, group[0], group[-1]))
     return trades
 
 
@@ -159,8 +168,8 @@ def group_trades_by_date_save(symbol: str, trades: list[dict], save_dir: str, ch
         return
 
 
-def download_missing_trades_and_save(symbol: str, missing_ids: list[int], save_dir: str) -> None:
-    trades = download_missing_trades(symbol, missing_ids)
+def download_missing_trades_and_save(syb_type: SymbolType, symbol: str, missing_ids: list[int], save_dir: str) -> None:
+    trades = download_missing_trades(syb_type, symbol, missing_ids)
     group_trades_by_date_save(symbol, trades, save_dir)
     
 
@@ -204,7 +213,7 @@ def multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir: str, missing_dir: s
         pool.starmap(merge_raw_and_missing_trades, [(file_name, raw_dir, missing_dir, save_dir) for file_name in os.listdir(raw_dir)])
         
 
-def multi_proc_merge_one_symbol_raw_and_missing_trades(pair_type: str, symbol: str, max_workers: int = config.max_workers) -> None:
+def multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type: SymbolType, symbol: str, max_workers: int = config.max_workers) -> None:
     """Merge raw and missing trades for one symbol using multiple processes.
 
     This function merges raw trades from unzipped files with any missing trades that were downloaded
@@ -212,11 +221,11 @@ def multi_proc_merge_one_symbol_raw_and_missing_trades(pair_type: str, symbol: s
     symbol in parallel using multiple worker processes.
 
     Args:
-        pair_type (str): The trading pair type (e.g. "spot", "futures/um", "futures/cm")
+        syb_type (SymbolType): The trading pair type (e.g. SymbolType.SPOT, SymbolType.FUTURES_UM, SymbolType.FUTURES_CM)
         symbol (str): The trading symbol (e.g. "BTCUSDT")
         max_workers (int, optional): Maximum number of worker processes to use. Defaults to config.max_workers.
     """
-    prefix = f"data/{pair_type}/daily/aggTrades/{symbol}"
+    prefix = f"data/{syb_type.value}/daily/aggTrades/{symbol}"
     raw_dir = os.path.join(config.unzip_binance_vision_dir, prefix)
     missing_dir = os.path.join(config.missing_binance_vision_dir, prefix)
     save_dir = os.path.join(config.tidy_binance_vision_dir, prefix)
