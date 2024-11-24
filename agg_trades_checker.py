@@ -202,7 +202,6 @@ def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str,
     merged_df = pd.concat([raw_df, missing_df])
     merged_df.sort_values(by="id", inplace=True, key=lambda x: x.astype(int))
     
-
     merged_df.to_csv(tidy_path, index=False)
 
     _logger.info(f"Saved merged trades to {os.path.join(save_dir, file_name)}")
