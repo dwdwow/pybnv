@@ -4,11 +4,10 @@ import itertools
 import logging
 from multiprocessing import Pool
 import os
+from enums import SymbolType
 
-import pandas as pd
 import config
 import csv_util
-from enums import SymbolType
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
@@ -137,8 +136,6 @@ def merge_one_file_agg_trades_to_klines(
     return klines
 
 
-_float_formater = lambda x: f"{round(x, _decimal_places):.{_decimal_places}f}".rstrip("0").rstrip(".") if isinstance(x, float) else str(x)
-
 def merge_one_dir_agg_trades_to_klines(
         syb_type: SymbolType,
         symbol: str,
@@ -151,19 +148,26 @@ def merge_one_dir_agg_trades_to_klines(
         ) -> None:
     
     if start_agg_trade_file_name:
-        dt = datetime.datetime.strptime(start_agg_trade_file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv"), "%Y-%m-%d")
-        dt = dt - datetime.timedelta(seconds=interval_seconds)
-        fn = f"{symbol}-aggTrades-{dt.strftime('%Y-%m-%d', tz=datetime.timezone.utc)}.csv"
+        cdt = datetime.datetime.strptime(start_agg_trade_file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv"), "%Y-%m-%d")
+        cdt = cdt - datetime.timedelta(days=1)
+        fn = f"{symbol}-aggTrades-{cdt.strftime('%Y-%m-%d', tz=datetime.timezone.utc)}.csv"
         if os.path.exists(f"{agg_trades_root_dir}/data/{syb_type.value}/daily/aggTrades/{symbol}/{fn}"):
             start_agg_trade_file_name = fn
-
-    interval_ms = interval_seconds*1000
-
+            
     agg_trades_dir = f"{agg_trades_root_dir}/data/{syb_type.value}/daily/aggTrades/{symbol}"
     agg_trades_file_names = os.listdir(agg_trades_dir)
     agg_trades_file_names.sort()
     if start_agg_trade_file_name:
         agg_trades_file_names = [f for f in agg_trades_file_names if f >= start_agg_trade_file_name]
+        
+    if len(agg_trades_file_names) == 0:
+        _logger.info(f"no agg trades files found")
+        return
+        
+    _logger.info(f"agg_trades_files: {agg_trades_file_names[0]} ~ {agg_trades_file_names[-1]}")
+        
+    klines_dir = f"{klines_root_dir}/data/{syb_type.value}/daily/klines/{symbol}/{interval_seconds}s"
+    os.makedirs(klines_dir, mode=0o777, exist_ok=True)
         
     kline_dict: dict[str, list[dict]] = {}
     
@@ -171,62 +175,75 @@ def merge_one_dir_agg_trades_to_klines(
         agg_trade_file_path = f"{agg_trades_dir}/{file_name}"
         with Pool(max_workers) as p:
             kss = p.starmap(merge_one_file_agg_trades_to_klines, [(interval_seconds, agg_trade_file_path)])
-            for k in kss:
-                kline_dict[file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv")] = k
+            for ks in kss:
+                kline_dict[file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv")] = ks
                 
-    for dt, klines in kline_dict.items():
-        if len(klines) == 0:
-            continue
+    with Pool(max_workers) as p:
+        for dt, klines in kline_dict.items():
+            p.starmap(
+                _add_leading_missing_klines_and_save, 
+                [(interval_seconds, dt, klines, kline_dict, check_exist, klines_dir, symbol)]
+                )
 
-        first_not_zero_price_index = len(klines)
-        for k in klines:
-            if k["openPrice"] != 0.0:
-                first_not_zero_price_index = klines.index(k)
-                break
-        if first_not_zero_price_index > 0:
-            lot = datetime.datetime.strptime(dt, "%Y-%m-%d", tz=datetime.timezone.utc) - datetime.timedelta(seconds=interval_seconds)
-            ldt = lot.strftime("%Y-%m-%d")
-            lklines = kline_dict.get(ldt)
-            if lklines is not None and len(lklines) != 0:
-                fko = klines[0]["openTime"]
-                last_lk = lklines[-1]
-                close_price = last_lk["closePrice"]
-                for i in range(first_not_zero_price_index):
-                    op = fko + interval_ms * i
-                    klines[i] = {
-                        "openTime": op,
-                        "openPrice": close_price,
-                        "highPrice": close_price,
-                        "lowPrice": close_price,
-                        "closePrice": close_price,
-                        "volume": 0,
-                        "closeTime": op + interval_ms - 1,
-                        "quoteAssetVolume": 0,
-                        "tradesNumber": 0,
-                        "takerBuyBaseAssetVolume": 0,
-                        "takerBuyQuoteAssetVolume": 0,
-                        "unused": 0,
-                    }
+                    
+def _float_formater(x) -> str:
+    if not isinstance(x, float):
+        return str(x)
+    formatted = f"{round(x, _decimal_places):.{_decimal_places}f}".rstrip("0").rstrip(".")
+    return formatted
 
-        klines_file_path = f"{klines_root_dir}/data/{syb_type.value}/daily/klines/{symbol}/{interval_seconds}s/{symbol}-{interval_seconds}s-{dt}.csv"
-        if check_exist and os.path.exists(klines_file_path):
-            continue
-        with open(klines_file_path, "w") as f:
-            writer = csv.DictWriter(f, fieldnames=csv_util.klines_headers)
-            writer.writeheader()
-            for kline in klines:
-                for k, v in kline.items():
-                    kline[k] = _float_formater(v)
-                writer.writerow(kline)
             
+def _add_leading_missing_klines_and_save(interval_seconds: int, tody_data: str, klines: list[dict], kline_dict: dict[str, list[dict]], check_exist: bool, klines_dir: str, symbol: str) -> None:
+    if len(klines) == 0:
+        return
+    
+    interval_ms = interval_seconds*1000
+
+    first_not_zero_price_index = len(klines)
+    for k in klines:
+        if k["openPrice"] != 0.0:
+            first_not_zero_price_index = klines.index(k)
+            break
+
+    if first_not_zero_price_index > 0:
+        lot = datetime.datetime.strptime(tody_data, "%Y-%m-%d", tz=datetime.timezone.utc) - datetime.timedelta(days=1)
+        ldt = lot.strftime("%Y-%m-%d")
+        lklines = kline_dict.get(ldt)
+        if lklines is not None and len(lklines) != 0:
+            fko = klines[0]["openTime"]
+            last_lk = lklines[-1]
+            close_price = last_lk["closePrice"]
+            for i in range(first_not_zero_price_index):            
+                op = fko + interval_ms * i
+                klines[i] = {
+                    "openTime": op,
+                    "openPrice": close_price,
+                    "highPrice": close_price,
+                    "lowPrice": close_price,
+                    "closePrice": close_price,
+                    "volume": 0,
+                    "closeTime": op + interval_ms - 1,
+                    "quoteAssetVolume": 0,
+                    "tradesNumber": 0,
+                    "takerBuyBaseAssetVolume": 0,
+                    "takerBuyQuoteAssetVolume": 0,
+                    "unused": 0,
+                }
+
+    klines_file_path = f"{klines_dir}/{symbol}-{interval_seconds}s-{tody_data}.csv"
+    if check_exist and os.path.exists(klines_file_path):
+        return
+    with open(klines_file_path, "w") as f:
+        writer = csv.DictWriter(f, fieldnames=csv_util.klines_headers)
+        writer.writeheader()
+        for kline in klines:
+            for k, v in kline.items():
+                kline[k] = _float_formater(v)
+            writer.writerow(kline)
+
 
 if __name__ == "__main__":
+    syb_type = SymbolType.SPOT
     symbol = "PEPEUSDT"
     interval_seconds = 1
-    dt = "2024-01-01"   
-    file_path = config.unzip_binance_vision_dir + f"/data/spot/daily/aggTrades/{symbol}/{symbol}-aggTrades-{dt}.csv"
-    klines = merge_one_file_agg_trades_to_klines(interval_seconds, file_path)
-    klines_file_path = f"{symbol}-{interval_seconds}s-{dt}.csv"
-    # df = pd.DataFrame(klines)
-    # df.columns = csv_util.klines_headers
-    # df.to_csv(klines_file_path, float_format=float_format, index=False)
+    merge_one_dir_agg_trades_to_klines(syb_type, symbol, interval_seconds)
