@@ -10,6 +10,7 @@ from enums import SymbolType
 def merge_one_file_agg_trades_to_klines(
         interval_seconds: int,
         agg_trade_file_path: str,
+        last_kline_before_today: dict | None = None,
         ) -> list[dict]:
     df = None
     # Read agg trades file into pandas DataFrame
@@ -114,6 +115,7 @@ def merge_one_file_agg_trades_to_klines(
                 "takerBuyQuoteAssetVolume": 0,
             })
             
+    # Some agg trades of last intervals may be missing at the end of the day
     last_kline = klines[-1]
     
     lko = last_kline["openTime"]
@@ -140,6 +142,35 @@ def merge_one_file_agg_trades_to_klines(
             "takerBuyQuoteAssetVolume": 0,
         })
         
+    if last_kline_before_today is None:
+        return klines
+    
+    # Some agg trades of first intervals may be missing at the beginning of the day
+    # We need to fill them by the last day's last kline
+    lkbto = last_kline_before_today["openTime"]
+    fk = klines[0]
+    fko = fk["openTime"]
+    missing_num = (fko - lkbto) // interval_ms - 1
+    if missing_num == 0:
+        return klines
+    
+    close_price = last_kline_before_today["closePrice"]
+    for i in range(missing_num):
+        open_time = lkbto + interval_ms * (i+1)
+        klines.insert(0, {
+            "openTime": open_time,
+            "openPrice": close_price,
+            "highPrice": close_price,
+            "lowPrice": close_price,
+            "closePrice": close_price,
+            "volume": 0,
+            "closeTime": open_time + interval_ms - 1,
+            "quoteAssetVolume": 0,
+            "tradesNumber": 0,
+            "takerBuyBaseAssetVolume": 0,
+            "takerBuyQuoteAssetVolume": 0,
+        })
+
     return klines
 
 
@@ -153,6 +184,11 @@ def merge_one_dir_agg_trades_to_klines(
         check_exist: bool = True,
         max_workers: int = config.max_workers,
         ) -> None:
+    
+    if start_agg_trade_file_name:
+        dt = datetime.datetime.strptime(start_agg_trade_file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv"), "%Y-%m-%d")
+        dt = dt - datetime.timedelta(seconds=interval_seconds)
+        start_agg_trade_file_name = f"{symbol}-aggTrades-{dt.strftime('%Y-%m-%d', tz=datetime.timezone.utc)}.csv"
 
     interval_ms = interval_seconds*1000
 
@@ -162,8 +198,6 @@ def merge_one_dir_agg_trades_to_klines(
     if start_agg_trade_file_name:
         agg_trades_file_names = [f for f in agg_trades_file_names if f >= start_agg_trade_file_name]
         
-    start_time = datetime.datetime.strptime(start_agg_trade_file_name, f"{symbol}-aggTrades-%Y-%m-%d.csv", tz=datetime.timezone.utc)
-
     kline_dict: dict[str, list[dict]] = {}
     
     for file_name in agg_trades_file_names:
@@ -214,5 +248,4 @@ def merge_one_dir_agg_trades_to_klines(
             writer.writerows(klines)
             
 
-    
     

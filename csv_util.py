@@ -43,6 +43,15 @@ def has_header(file: TextIO) -> bool:
         return False
     
 
+def get_last_row_ignore_header(filename: str) -> str:
+    with open(filename, 'rb') as file:
+        file.seek(-2, 2)  # Move to the second last byte
+        while file.read(1) != b'\n':  # Move backwards until a newline is found
+            file.seek(-2, 1)
+        last_row = file.readline().decode()  # Read and decode the last line
+    return last_row
+    
+
 def csv_to_pandas(file: TextIO, headers: list[str]) -> pd.DataFrame:
     has_h = has_header(file)
     frame = None
