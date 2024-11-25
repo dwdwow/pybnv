@@ -128,7 +128,7 @@ def check_one_file_klines(klines_file_path: str, interval_seconds: int) -> dict:
         }
     
 
-def check_one_dir_klines(dir_path: str, start_file_name: str, interval_seconds: int) -> list[dict]:
+def multi_proc_check_one_dir_klines(dir_path: str, start_file_name: str, interval_seconds: int) -> list[dict]:
     file_names = os.listdir(dir_path)
     if start_file_name:
         file_names = [f for f in file_names if f >= start_file_name]
@@ -153,4 +153,4 @@ def check_one_dir_klines(dir_path: str, start_file_name: str, interval_seconds: 
 
 
 if __name__ == "__main__":
-    print(check_one_dir_klines(f"{config.diy_binance_vision_dir}/data/spot/daily/klines/PEPEUSDT/1s", "", 1))
+    print(multi_proc_check_one_dir_klines(f"{config.diy_binance_vision_dir}/data/spot/daily/klines/PEPEUSDT/1s", "", 1))

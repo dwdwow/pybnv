@@ -135,7 +135,7 @@ def merge_one_file_agg_trades_to_klines(
     return klines
 
 
-def merge_one_dir_agg_trades_to_klines(
+def multi_proc_merge_one_dir_agg_trades_to_klines(
         syb_type: SymbolType,
         symbol: str,
         interval_seconds: int,
@@ -260,4 +260,4 @@ if __name__ == "__main__":
     syb_type = SymbolType.SPOT
     symbol = "PEPEUSDT"
     interval_seconds = 1
-    merge_one_dir_agg_trades_to_klines(syb_type, symbol, interval_seconds)
+    multi_proc_merge_one_dir_agg_trades_to_klines(syb_type, symbol, interval_seconds)

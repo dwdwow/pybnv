@@ -18,7 +18,7 @@ def tidy_one_symbol(
         ):
     prefix = f"data/{syb_type.value}/daily/aggTrades/{symbol}"
     
-    raw_downloader.download(prefix, "", raw_root_dir)
+    raw_downloader.multi_proc_download(prefix, "", raw_root_dir)
     
     raw_unzipper.multi_proc_unzip_one_dir_files_to_dir(raw_root_dir, unzip_root_dir)
     
