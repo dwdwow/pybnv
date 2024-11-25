@@ -185,6 +185,7 @@ def merge_one_dir_agg_trades_to_klines(
             _add_leading_missing_klines_and_save, 
             [(interval_seconds, dt, klines, kline_dict, check_exist, klines_dir, symbol) for dt, klines in kline_dict.items()]
         )
+
                     
 def _float_formater(x) -> str:
     if not isinstance(x, float):
@@ -195,7 +196,7 @@ def _float_formater(x) -> str:
             
 def _add_leading_missing_klines_and_save(
         interval_seconds: int, 
-        tody_data: str, 
+        tody_date: str, 
         klines: list[dict], 
         kline_dict: dict[str, list[dict]], 
         check_exist: bool, 
@@ -204,6 +205,8 @@ def _add_leading_missing_klines_and_save(
         ) -> None:
     if len(klines) == 0:
         return
+    
+    _logger.debug(f"checking klines leading missing klines, symbol: {symbol}, date: {tody_date}, klines_len: {len(klines)}")
     
     interval_ms = interval_seconds*1000
 
@@ -214,7 +217,7 @@ def _add_leading_missing_klines_and_save(
             break
 
     if first_not_zero_price_index > 0:
-        lot = datetime.datetime.strptime(tody_data, "%Y-%m-%d") - datetime.timedelta(days=1)
+        lot = datetime.datetime.strptime(tody_date, "%Y-%m-%d") - datetime.timedelta(days=1)
         ldt = lot.strftime("%Y-%m-%d")
         lklines = kline_dict.get(ldt)
         if lklines is not None and len(lklines) != 0:
@@ -238,7 +241,7 @@ def _add_leading_missing_klines_and_save(
                     "unused": 0,
                 }
 
-    klines_file_path = f"{klines_dir}/{symbol}-{interval_seconds}s-{tody_data}.csv"
+    klines_file_path = f"{klines_dir}/{symbol}-{interval_seconds}s-{tody_date}.csv"
     _logger.debug(f"saving klines to {klines_file_path}")
     if check_exist and os.path.exists(klines_file_path):
         _logger.debug(f"klines file already exists, skipping, {klines_file_path}")
