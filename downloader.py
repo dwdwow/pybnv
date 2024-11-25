@@ -2,6 +2,8 @@ from multiprocessing import Pool
 import os, requests, logging, config
 from urllib.parse import urlparse
 
+import zipper
+
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
 
@@ -23,6 +25,10 @@ def download_save(url: str, save_dir: str, check_exists: bool = True) -> None:
         return
     os.makedirs(save_dir, exist_ok=True)
     data = download(url)
+    if url.endswith(".zip"):
+        if not zipper.is_valid_zip(data):
+            _logger.error(f"Invalid zip file: {url}")
+            raise Exception(f"Invalid zip file: {url}")
     with open(save_path, 'wb') as f:
         f.write(data)
         

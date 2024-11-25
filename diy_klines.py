@@ -50,11 +50,7 @@ def merge_one_file_agg_trades_to_klines(
         "openTime": 0,
     }
     
-    _logger.debug(f"file: {agg_trade_file_path},
-                   df.shape: {df.shape},
-                   kline_num: {kline_num}, 
-                   start: {datetime.datetime.fromtimestamp(start_ms//1000, tz=datetime.timezone.utc)}, 
-                   interval_ms: {interval_ms}")
+    _logger.debug(f"file: {agg_trade_file_path}, df.shape: {df.shape}, kline_num: {kline_num}, start: {datetime.datetime.fromtimestamp(start_ms//1000, tz=datetime.timezone.utc)}, interval_ms: {interval_ms}")
     
     for row in df.itertuples():
         time_ms = row.time

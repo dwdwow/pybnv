@@ -65,25 +65,20 @@ def check_one_file_consistency(file_path: str, headers: list[str]) -> tuple[int,
         return start_id, end_id, missing_ids
             
 
-def multi_proc_check_one_dir_consistency(dir_path: str, headers: list[str], start_file_name: str = "", max_workers: int = config.max_workers) -> list[int]:
-    """Check consistency of IDs across multiple CSV files using multiprocessing.
-
-    Args:
-        file_paths: List of paths to CSV files to check
-        headers: List of column headers expected in the CSV files
-        max_workers: Maximum number of worker processes to use (default: from config)
-
-    Returns:
-        List of missing IDs found across all files. The files are processed in order
-        and gaps between files are included in the missing IDs list.
-    """
+def multi_proc_check_one_dir_consistency(dir_path: str, headers: list[str], start_file_name: str | None = None, max_workers: int = config.max_workers) -> list[int]:
     infos: list[tuple[int, int, list[int]]] = []
+    if start_file_name is None:
+        start_file_name = ""
+
     with Pool(processes=max_workers) as pool:
-        infos = pool.starmap(check_one_file_consistency, [(os.path.join(dir_path, name), headers) for name in os.listdir(dir_path) if name.endswith(".csv") and (start_file_name == "" or name >= start_file_name)])
+        infos = pool.starmap(check_one_file_consistency, [(os.path.join(dir_path, name), headers) for name in os.listdir(dir_path) if name.endswith(".csv") and name >= start_file_name])
+        
+    if len(infos) == 0:
+        return []
     
     infos.sort(key=lambda x: x[0])
     
-    if len(infos) <= 1:
+    if len(infos) == 1:
         return infos[0][2]
     
     last_end_id = infos[0][1]
@@ -174,6 +169,8 @@ def download_missing_trades_and_save(syb_type: SymbolType, symbol: str, missing_
     
 
 def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str, save_dir: str, check_tidy_file_exists: bool = True) -> None:
+    os.makedirs(missing_dir, exist_ok=True)
+    os.makedirs(save_dir, exist_ok=True)
     tidy_path = os.path.join(save_dir, file_name)
     if check_tidy_file_exists and os.path.exists(tidy_path):
         _logger.info(f"Tidy file {tidy_path} already exists, skipping")
@@ -207,29 +204,46 @@ def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str,
     _logger.info(f"Saved merged trades to {os.path.join(save_dir, file_name)}")
     
 
-def multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir: str, missing_dir: str, save_dir: str, max_workers: int = config.max_workers) -> None:
+def multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir: str, missing_dir: str, save_dir: str, check_tidy_file_exists: bool = True, max_workers: int = config.max_workers) -> None:
+    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(missing_dir, exist_ok=True)
+    os.makedirs(raw_dir, exist_ok=True)
     with Pool(processes=max_workers) as pool:
-        pool.starmap(merge_raw_and_missing_trades, [(file_name, raw_dir, missing_dir, save_dir) for file_name in os.listdir(raw_dir)])
+        pool.starmap(merge_raw_and_missing_trades, [(file_name, raw_dir, missing_dir, save_dir, check_tidy_file_exists) for file_name in os.listdir(raw_dir)])
         
 
-def multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type: SymbolType, symbol: str, max_workers: int = config.max_workers) -> None:
-    """Merge raw and missing trades for one symbol using multiple processes.
-
-    This function merges raw trades from unzipped files with any missing trades that were downloaded
-    separately, saving the combined results to the tidy directory. It processes all files for a given
-    symbol in parallel using multiple worker processes.
-
-    Args:
-        syb_type (SymbolType): The trading pair type (e.g. SymbolType.SPOT, SymbolType.FUTURES_UM, SymbolType.FUTURES_CM)
-        symbol (str): The trading symbol (e.g. "BTCUSDT")
-        max_workers (int, optional): Maximum number of worker processes to use. Defaults to config.max_workers.
-    """
+def multi_proc_merge_one_symbol_raw_and_missing_trades(
+        syb_type: SymbolType,
+        symbol: str,
+        unzip_root_dir: str = config.unzip_binance_vision_dir,
+        missing_root_dir: str = config.missing_binance_vision_dir,
+        tidy_root_dir: str = config.tidy_binance_vision_dir,
+        check_tidy_file_exists: bool = True,
+        max_workers: int = config.max_workers
+    ) -> None:
     prefix = f"data/{syb_type.value}/daily/aggTrades/{symbol}"
-    raw_dir = os.path.join(config.unzip_binance_vision_dir, prefix)
-    missing_dir = os.path.join(config.missing_binance_vision_dir, prefix)
-    save_dir = os.path.join(config.tidy_binance_vision_dir, prefix)
-    multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir, missing_dir, save_dir, max_workers)
+    raw_dir = os.path.join(unzip_root_dir, prefix)
+    missing_dir = os.path.join(missing_root_dir, prefix)
+    save_dir = os.path.join(tidy_root_dir, prefix)
+    multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir, missing_dir, save_dir, check_tidy_file_exists, max_workers)
     
 
 if __name__ == "__main__":
-    multi_proc_merge_one_symbol_raw_and_missing_trades("spot", "PEPEUSDT")    
+    syb_type = SymbolType.SPOT
+    symbol = "PEPEUSDT"
+    prefix = f"data/{syb_type.value}/daily/aggTrades/{symbol}"
+
+    unzip_root_dir = config.unzip_binance_vision_dir
+    missing_root_dir = config.missing_binance_vision_dir
+
+    unzip_dir_path = f"{unzip_root_dir}/{prefix}"
+
+    missing_ids = multi_proc_check_one_dir_consistency(unzip_dir_path, csv_util.agg_trades_headers)
+    if missing_ids:
+        _logger.info(f"Downloading {len(missing_ids)} missing trades for {symbol}")
+        missing_dir_path = f"{missing_root_dir}/{prefix}"
+        download_missing_trades_and_save(syb_type, symbol, missing_ids, missing_dir_path)
+        _logger.info(f"Downloaded {len(missing_ids)} missing trades for {symbol}")
+    _logger.info(f"Merging raw and missing trades for {symbol}")
+    multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type, symbol)
+    _logger.info(f"Merged raw and missing trades for {symbol}")

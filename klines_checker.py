@@ -3,6 +3,7 @@ import os
 import pandas as pd
 
 import config
+from enums import SymbolType
 
 
 def check_one_file_klines_interval(klines_file_path: str, interval_seconds: int) -> list[int]:
@@ -109,7 +110,7 @@ def check_one_file_klines(klines_file_path: str, interval_seconds: int) -> dict:
         
         # Find any intervals with incorrect duration
         invalid_intervals = time_diffs != expected_diff
-        
+ 
         i = 0
         for invalid in invalid_intervals:
             if invalid:
@@ -128,12 +129,12 @@ def check_one_file_klines(klines_file_path: str, interval_seconds: int) -> dict:
         }
     
 
-def multi_proc_check_one_dir_klines(dir_path: str, start_file_name: str, interval_seconds: int) -> list[dict]:
+def multi_proc_check_one_dir_klines(dir_path: str, interval_seconds: int, start_file_name: str | None = None, max_workers: int = config.max_workers) -> list[dict]:
     file_names = os.listdir(dir_path)
     if start_file_name:
         file_names = [f for f in file_names if f >= start_file_name]
 
-    with Pool(config.max_workers) as pool:
+    with Pool(max_workers) as pool:
         check_results = pool.starmap(check_one_file_klines, [(f"{dir_path}/{f}", interval_seconds) for f in file_names])
 
     check_results.sort(key=lambda x: x["first_open_time"])
@@ -150,6 +151,20 @@ def multi_proc_check_one_dir_klines(dir_path: str, start_file_name: str, interva
             result["invalid_ts"].append(last_open_time + (j + 1) * interval_ms)
 
     return [r for r in check_results if r["invalid_ts"]]
+
+
+def multi_proc_check_one_symbol_klines(
+        syb_type: SymbolType, 
+        symbol: str, 
+        interval_seconds: int, 
+        start_file_name: str | None = None, 
+        klines_root_dir: str = config.diy_binance_vision_dir, 
+        max_workers: int = config.max_workers
+    ) -> list[dict]:
+    prefix = f"data/{syb_type.value}/daily/klines/{symbol}"
+    klines_dir = f"{klines_root_dir}/{prefix}"
+    return multi_proc_check_one_dir_klines(klines_dir, interval_seconds, start_file_name, max_workers=max_workers)
+
 
 
 if __name__ == "__main__":
