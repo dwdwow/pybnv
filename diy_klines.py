@@ -24,13 +24,10 @@ def merge_one_file_agg_trades_to_klines(
     df = None
 
     # Read agg trades file into pandas DataFrame
-    _logger.debug(f"reading agg trades file: {agg_trade_file_path}")
     with open(agg_trade_file_path, "r") as f:
         df = csv_util.csv_to_pandas(f, csv_util.agg_trades_headers)
-    _logger.debug(f"df.shape: {df.shape}")
     
     if df is None or df.empty:
-        _logger.debug(f"df is None or df.empty")
         return []
 
     one_day_ms = 24*60*60*1000
@@ -47,15 +44,17 @@ def merge_one_file_agg_trades_to_klines(
     if one_day_ms % interval_ms != 0:
         kline_num += 1
         
-    _logger.debug(f"kline_num: {kline_num}")
-
     klines: list[dict] = list(itertools.islice(itertools.repeat(None), kline_num))
     
     kline: dict = {
         "openTime": 0,
     }
     
-    _logger.debug(f"start_ms: {start_ms}, interval_ms: {interval_ms}")
+    _logger.debug(f"file: {agg_trade_file_path},
+                   df.shape: {df.shape},
+                   kline_num: {kline_num}, 
+                   start: {datetime.datetime.fromtimestamp(start_ms//1000, tz=datetime.timezone.utc)}, 
+                   interval_ms: {interval_ms}")
     
     for row in df.itertuples():
         time_ms = row.time
@@ -150,7 +149,7 @@ def merge_one_dir_agg_trades_to_klines(
     if start_agg_trade_file_name:
         cdt = datetime.datetime.strptime(start_agg_trade_file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv"), "%Y-%m-%d")
         cdt = cdt - datetime.timedelta(days=1)
-        fn = f"{symbol}-aggTrades-{cdt.strftime('%Y-%m-%d', tz=datetime.timezone.utc)}.csv"
+        fn = f"{symbol}-aggTrades-{cdt.strftime('%Y-%m-%d')}.csv"
         if os.path.exists(f"{agg_trades_root_dir}/data/{syb_type.value}/daily/aggTrades/{symbol}/{fn}"):
             start_agg_trade_file_name = fn
             
@@ -171,20 +170,21 @@ def merge_one_dir_agg_trades_to_klines(
         
     kline_dict: dict[str, list[dict]] = {}
     
-    for file_name in agg_trades_file_names:
-        agg_trade_file_path = f"{agg_trades_dir}/{file_name}"
-        with Pool(max_workers) as p:
-            kss = p.starmap(merge_one_file_agg_trades_to_klines, [(interval_seconds, agg_trade_file_path)])
-            for ks in kss:
-                kline_dict[file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv")] = ks
+    with Pool(max_workers) as p:
+        kss = p.starmap(merge_one_file_agg_trades_to_klines, [(interval_seconds, f"{agg_trades_dir}/{fn}") for fn in agg_trades_file_names])
+        for ks in kss:
+            if len(ks) == 0:
+                continue
+            fdt = datetime.datetime.fromtimestamp(ks[0]["openTime"]//1000, tz=datetime.timezone.utc)
+            kline_dict[fdt.strftime("%Y-%m-%d")] = ks
+    
+    _logger.debug(f"kline_dict_len: {len(kline_dict)}")
                 
     with Pool(max_workers) as p:
-        for dt, klines in kline_dict.items():
-            p.starmap(
-                _add_leading_missing_klines_and_save, 
-                [(interval_seconds, dt, klines, kline_dict, check_exist, klines_dir, symbol)]
-                )
-
+        p.starmap(
+            _add_leading_missing_klines_and_save, 
+            [(interval_seconds, dt, klines, kline_dict, check_exist, klines_dir, symbol) for dt, klines in kline_dict.items()]
+        )
                     
 def _float_formater(x) -> str:
     if not isinstance(x, float):
@@ -193,7 +193,15 @@ def _float_formater(x) -> str:
     return formatted
 
             
-def _add_leading_missing_klines_and_save(interval_seconds: int, tody_data: str, klines: list[dict], kline_dict: dict[str, list[dict]], check_exist: bool, klines_dir: str, symbol: str) -> None:
+def _add_leading_missing_klines_and_save(
+        interval_seconds: int, 
+        tody_data: str, 
+        klines: list[dict], 
+        kline_dict: dict[str, list[dict]], 
+        check_exist: bool, 
+        klines_dir: str, 
+        symbol: str
+        ) -> None:
     if len(klines) == 0:
         return
     
@@ -206,7 +214,7 @@ def _add_leading_missing_klines_and_save(interval_seconds: int, tody_data: str, 
             break
 
     if first_not_zero_price_index > 0:
-        lot = datetime.datetime.strptime(tody_data, "%Y-%m-%d", tz=datetime.timezone.utc) - datetime.timedelta(days=1)
+        lot = datetime.datetime.strptime(tody_data, "%Y-%m-%d") - datetime.timedelta(days=1)
         ldt = lot.strftime("%Y-%m-%d")
         lklines = kline_dict.get(ldt)
         if lklines is not None and len(lklines) != 0:
@@ -231,7 +239,9 @@ def _add_leading_missing_klines_and_save(interval_seconds: int, tody_data: str, 
                 }
 
     klines_file_path = f"{klines_dir}/{symbol}-{interval_seconds}s-{tody_data}.csv"
+    _logger.debug(f"saving klines to {klines_file_path}")
     if check_exist and os.path.exists(klines_file_path):
+        _logger.debug(f"klines file already exists, skipping, {klines_file_path}")
         return
     with open(klines_file_path, "w") as f:
         writer = csv.DictWriter(f, fieldnames=csv_util.klines_headers)
@@ -240,6 +250,7 @@ def _add_leading_missing_klines_and_save(interval_seconds: int, tody_data: str, 
             for k, v in kline.items():
                 kline[k] = _float_formater(v)
             writer.writerow(kline)
+    _logger.debug(f"saved klines to {klines_file_path}")
 
 
 if __name__ == "__main__":
