@@ -1,10 +1,19 @@
 import csv
 import datetime
+import itertools
+import logging
 from multiprocessing import Pool
 import os
+
+import pandas as pd
 import config
 import csv_util
 from enums import SymbolType
+
+_logger = logging.getLogger(__name__)
+_logger.setLevel(logging.DEBUG)
+
+_decimal_places = 10
 
 
 def merge_one_file_agg_trades_to_klines(
@@ -12,167 +21,123 @@ def merge_one_file_agg_trades_to_klines(
         agg_trade_file_path: str,
         last_kline_before_today: dict | None = None,
         ) -> list[dict]:
+
     df = None
+
     # Read agg trades file into pandas DataFrame
+    _logger.debug(f"reading agg trades file: {agg_trade_file_path}")
     with open(agg_trade_file_path, "r") as f:
         df = csv_util.csv_to_pandas(f, csv_util.agg_trades_headers)
+    _logger.debug(f"df.shape: {df.shape}")
     
-    if df is None:
-        return
-    
-    # Get first line
-    if df.empty:
-        return
+    if df is None or df.empty:
+        _logger.debug(f"df is None or df.empty")
+        return []
 
-    first_row = df.iloc[0]
-    
-    first_time = first_row["time"]
-    
     one_day_ms = 24*60*60*1000
-    
-    start_ms = int(first_time)//one_day_ms*one_day_ms
     interval_ms = interval_seconds*1000
     
-    klines: list[dict] = []
+    if one_day_ms % interval_ms != 0:
+        raise ValueError(f"interval_ms: {interval_ms} is not a divisor of one_day_ms: {one_day_ms}")
+
+    first_time = df.at[0, "time"]
+    start_ms = int(first_time)//one_day_ms*one_day_ms
+    
+    kline_num = one_day_ms // interval_ms
+    # no use, just for safety
+    if one_day_ms % interval_ms != 0:
+        kline_num += 1
+        
+    _logger.debug(f"kline_num: {kline_num}")
+
+    klines: list[dict] = list(itertools.islice(itertools.repeat(None), kline_num))
+    
     kline: dict = {
         "openTime": 0,
     }
     
-    for row in df.iterrows():
-        time = row["time"]
-        open_time = (time - start_ms) // interval_ms * interval_ms + start_ms
-        quote_asset_volume = row["price"] * row["qty"]
-        if open_time != kline["openTime"]:
+    _logger.debug(f"start_ms: {start_ms}, interval_ms: {interval_ms}")
+    
+    for row in df.itertuples():
+        time_ms = row.time
+        open_time_ms = (time_ms - start_ms) // interval_ms * interval_ms + start_ms
+        quote_asset_volume = row.price * row.qty
+        if open_time_ms != kline["openTime"]:
             kline = {}
-            kline["openTime"] = open_time
-            kline["openPrice"] = row["price"]
-            kline["highPrice"] = row["price"]
-            kline["lowPrice"] = row["price"]
-            kline["closePrice"] = row["price"]
-            kline["volume"] = row["qty"]
-            kline["closeTime"] = open_time + interval_ms - 1
-            kline["quoteAssetVolume"] = quote_asset_volume
-            kline["tradesNumber"] = 1
-            if not row["isBuyerMaker"]:
-                kline["takerBuyBaseAssetVolume"] = row["qty"]
-                kline["takerBuyQuoteAssetVolume"] = quote_asset_volume
-            klines.append(kline)
-            continue
+            kline["openTime"] = open_time_ms
+            kline["openPrice"] = row.price
+            kline["highPrice"] = row.price
+            kline["lowPrice"] = row.price
+            kline["closePrice"] = row.price
+            kline["volume"] = 0.0
+            kline["closeTime"] = open_time_ms + interval_ms - 1
+            kline["quoteAssetVolume"] = 0.0
+            kline["tradesNumber"] = 0
+            kline["takerBuyBaseAssetVolume"] = 0.0
+            kline["takerBuyQuoteAssetVolume"] = 0.0
+            kline["unused"] = 0
+            i = (open_time_ms - start_ms) // interval_ms
+            klines[i] = kline
         
-        if row["price"] > kline["highPrice"]:
-            kline["highPrice"] = row["price"]
-        if row["price"] < kline["lowPrice"]:
-            kline["lowPrice"] = row["price"]
-        kline["closePrice"] = row["price"]
-        kline["volume"] += row["qty"]
+        if row.price > kline["highPrice"]:
+            kline["highPrice"] = row.price
+        if row.price < kline["lowPrice"]:
+            kline["lowPrice"] = row.price
+        kline["closePrice"] = row.price
+        kline["volume"] += row.qty
         kline["quoteAssetVolume"] += quote_asset_volume
         kline["tradesNumber"] += 1
-        if not row["isBuyerMaker"]:
-            kline["takerBuyBaseAssetVolume"] += row["qty"]
+        if not row.isBuyerMaker:
+            kline["takerBuyBaseAssetVolume"] += row.qty
             kline["takerBuyQuoteAssetVolume"] += quote_asset_volume
-            
+    
+    # for k in klines:
+    #     if k is None:
+    #         continue
+    #     k["volume"] = round(k["volume"], _decimal_places)
+    #     k["quoteAssetVolume"] = round(k["quoteAssetVolume"], _decimal_places)
+    #     k["takerBuyBaseAssetVolume"] = round(k["takerBuyBaseAssetVolume"], _decimal_places)
+    #     k["takerBuyQuoteAssetVolume"] = round(k["takerBuyQuoteAssetVolume"], _decimal_places)
+
+    last_real_kline_close_price = 0.0
+    if last_kline_before_today is not None:
+        last_real_kline_close_price = last_kline_before_today["closePrice"]
+
+    # can not use enumerate, because klines is too long
+    i = -1
     for k in klines:
-        k["volume"] = round(k["volume"], 12)
-        k["quoteAssetVolume"] = round(k["quoteAssetVolume"], 12)
-        k["takerBuyBaseAssetVolume"] = round(k["takerBuyBaseAssetVolume"], 12)
-        k["takerBuyQuoteAssetVolume"] = round(k["takerBuyQuoteAssetVolume"], 12)
-        
-    if len(klines) == 0:
-        return klines
-        
-    index = 1
-    
-    # Some intervals may be no agg trades, so we need to fill them
-    while True:
-        if index >= len(klines):
-            break
-
-        ck = klines[index]
-        lk = klines[index-1]
-        ck_ot = ck["openTime"]
-        lk_ot = lk["openTime"]
-
-        missing_num = (ck_ot - lk_ot) // interval_ms - 1
-        index += 1+missing_num
-
-        if missing_num == 0:
+        i += 1
+        if k is not None:
+            last_real_kline_close_price = k["closePrice"]
             continue
-        
-        close_price = lk["closePrice"]
-        for i in range(missing_num):
-            open_time = lk_ot + interval_ms * (i+1)
-            klines.insert(index, {
-                "openTime": open_time,
-                "openPrice": close_price,
-                "highPrice": close_price,
-                "lowPrice": close_price,
-                "closePrice": close_price,
-                "volume": 0,
-                "closeTime": open_time + interval_ms - 1,
-                "quoteAssetVolume": 0,
-                "tradesNumber": 0,
-                "takerBuyBaseAssetVolume": 0,
-                "takerBuyQuoteAssetVolume": 0,
-            })
-            
-    # Some agg trades of last intervals may be missing at the end of the day
-    last_kline = klines[-1]
-    
-    lko = last_kline["openTime"]
-    
-    missing_num = (start_ms + one_day_ms - lko) // interval_ms - 1
-    
-    if missing_num == 0:
-        return klines
-    
-    close_price = last_kline["closePrice"]
-    for i in range(missing_num):
-        open_time = lko + interval_ms * (i+1)
-        klines.append({
-            "openTime": open_time,
-            "openPrice": close_price,
-            "highPrice": close_price,
-            "lowPrice": close_price,
-            "closePrice": close_price,
+        open_time_ms = start_ms + interval_ms * i
+        klines[i] = {
+            "openTime": open_time_ms,
+            "openPrice": last_real_kline_close_price,
+            "highPrice": last_real_kline_close_price,
+            "lowPrice": last_real_kline_close_price,
+            "closePrice": last_real_kline_close_price,
             "volume": 0,
-            "closeTime": open_time + interval_ms - 1,
+            "closeTime": open_time_ms + interval_ms - 1,
             "quoteAssetVolume": 0,
             "tradesNumber": 0,
             "takerBuyBaseAssetVolume": 0,
             "takerBuyQuoteAssetVolume": 0,
-        })
+            "unused": 0,
+        }
         
-    if last_kline_before_today is None:
-        return klines
-    
-    # Some agg trades of first intervals may be missing at the beginning of the day
-    # We need to fill them by the last day's last kline
-    lkbto = last_kline_before_today["openTime"]
-    fk = klines[0]
-    fko = fk["openTime"]
-    missing_num = (fko - lkbto) // interval_ms - 1
-    if missing_num == 0:
-        return klines
-    
-    close_price = last_kline_before_today["closePrice"]
-    for i in range(missing_num):
-        open_time = lkbto + interval_ms * (i+1)
-        klines.insert(0, {
-            "openTime": open_time,
-            "openPrice": close_price,
-            "highPrice": close_price,
-            "lowPrice": close_price,
-            "closePrice": close_price,
-            "volume": 0,
-            "closeTime": open_time + interval_ms - 1,
-            "quoteAssetVolume": 0,
-            "tradesNumber": 0,
-            "takerBuyBaseAssetVolume": 0,
-            "takerBuyQuoteAssetVolume": 0,
-        })
-
+    # first_not_zero_price_index = len(klines)
+    # i = -1
+    # for k in klines:
+    #     i += 1
+    #     if k["closePrice"] != 0:
+    #         first_not_zero_price_index = i
+    #         break
+        
     return klines
 
+
+_float_formater = lambda x: f"{round(x, _decimal_places):.{_decimal_places}f}".rstrip("0").rstrip(".") if isinstance(x, float) else str(x)
 
 def merge_one_dir_agg_trades_to_klines(
         syb_type: SymbolType,
@@ -188,7 +153,9 @@ def merge_one_dir_agg_trades_to_klines(
     if start_agg_trade_file_name:
         dt = datetime.datetime.strptime(start_agg_trade_file_name.lstrip(f"{symbol}-aggTrades-").rstrip(".csv"), "%Y-%m-%d")
         dt = dt - datetime.timedelta(seconds=interval_seconds)
-        start_agg_trade_file_name = f"{symbol}-aggTrades-{dt.strftime('%Y-%m-%d', tz=datetime.timezone.utc)}.csv"
+        fn = f"{symbol}-aggTrades-{dt.strftime('%Y-%m-%d', tz=datetime.timezone.utc)}.csv"
+        if os.path.exists(f"{agg_trades_root_dir}/data/{syb_type.value}/daily/aggTrades/{symbol}/{fn}"):
+            start_agg_trade_file_name = fn
 
     interval_ms = interval_seconds*1000
 
@@ -210,42 +177,56 @@ def merge_one_dir_agg_trades_to_klines(
     for dt, klines in kline_dict.items():
         if len(klines) == 0:
             continue
-        st = datetime.datetime.strptime(dt, "%Y-%m-%d", tz=datetime.timezone.utc)
-        stms = st.timestamp()*1000
-        fk = klines[0]
-        fko = fk["openTime"]
-        missing_num = (fko - stms) // interval_ms
-        if missing_num != 0:
-            lst = st - datetime.timedelta(days=1)
-            ldt = lst.strftime("%Y-%m-%d")
-            lklines = kline_dict.get[ldt]
-            if lklines != None and len(lklines) != 0:
+
+        first_not_zero_price_index = len(klines)
+        for k in klines:
+            if k["openPrice"] != 0.0:
+                first_not_zero_price_index = klines.index(k)
+                break
+        if first_not_zero_price_index > 0:
+            lot = datetime.datetime.strptime(dt, "%Y-%m-%d", tz=datetime.timezone.utc) - datetime.timedelta(seconds=interval_seconds)
+            ldt = lot.strftime("%Y-%m-%d")
+            lklines = kline_dict.get(ldt)
+            if lklines is not None and len(lklines) != 0:
+                fko = klines[0]["openTime"]
                 last_lk = lklines[-1]
                 close_price = last_lk["closePrice"]
-                for i in range(missing_num):
-                    open_time = stms + interval_ms * i
-                    klines.insert(0, {
-                        "openTime": open_time,
+                for i in range(first_not_zero_price_index):
+                    op = fko + interval_ms * i
+                    klines[i] = {
+                        "openTime": op,
                         "openPrice": close_price,
                         "highPrice": close_price,
                         "lowPrice": close_price,
                         "closePrice": close_price,
                         "volume": 0,
-                        "closeTime": open_time + interval_ms - 1,
+                        "closeTime": op + interval_ms - 1,
                         "quoteAssetVolume": 0,
                         "tradesNumber": 0,
                         "takerBuyBaseAssetVolume": 0,
                         "takerBuyQuoteAssetVolume": 0,
-                    })
+                        "unused": 0,
+                    }
 
-
-        klines_file_path = f"{klines_root_dir}/data/{syb_type.value}/daily/klines/{symbol}/{symbol}-{interval_seconds}s-{dt}.csv"
+        klines_file_path = f"{klines_root_dir}/data/{syb_type.value}/daily/klines/{symbol}/{interval_seconds}s/{symbol}-{interval_seconds}s-{dt}.csv"
         if check_exist and os.path.exists(klines_file_path):
             continue
         with open(klines_file_path, "w") as f:
             writer = csv.DictWriter(f, fieldnames=csv_util.klines_headers)
             writer.writeheader()
-            writer.writerows(klines)
+            for kline in klines:
+                for k, v in kline.items():
+                    kline[k] = _float_formater(v)
+                writer.writerow(kline)
             
 
-    
+if __name__ == "__main__":
+    symbol = "PEPEUSDT"
+    interval_seconds = 1
+    dt = "2024-01-01"   
+    file_path = config.unzip_binance_vision_dir + f"/data/spot/daily/aggTrades/{symbol}/{symbol}-aggTrades-{dt}.csv"
+    klines = merge_one_file_agg_trades_to_klines(interval_seconds, file_path)
+    klines_file_path = f"{symbol}-{interval_seconds}s-{dt}.csv"
+    # df = pd.DataFrame(klines)
+    # df.columns = csv_util.klines_headers
+    # df.to_csv(klines_file_path, float_format=float_format, index=False)
