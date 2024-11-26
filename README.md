@@ -9,3 +9,6 @@ klines:
     将agg trades数据转换为klines数据，并检查klines数据
     diy_klines.py multi_proc_merge_one_symbol_agg_trades_to_klines
     klines_checker.py multi_proc_check_one_symbol_klines
+    
+config:
+    配置数据在 config.py
