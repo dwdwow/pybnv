@@ -135,7 +135,7 @@ def multi_proc_check_one_dir_klines(dir_path: str, interval_seconds: int, start_
         file_names = [f for f in file_names if f >= start_file_name]
 
     with Pool(max_workers) as pool:
-        check_results = pool.starmap(check_one_file_klines, [(f"{dir_path}/{f}", interval_seconds) for f in file_names])
+        check_results = pool.starmap(check_one_file_klines, [(os.path.join(dir_path, f), interval_seconds) for f in file_names])
 
     check_results.sort(key=lambda x: x["first_open_time"])
     
@@ -161,11 +161,10 @@ def multi_proc_check_one_symbol_klines(
         klines_root_dir: str = config.diy_binance_vision_dir, 
         max_workers: int = config.max_workers
     ) -> list[dict]:
-    prefix = f"data/{syb_type.value}/daily/klines/{symbol}"
-    klines_dir = f"{klines_root_dir}/{prefix}"
+    prefix = f"data/{syb_type.value}/daily/klines/{symbol}/{interval_seconds}s"
+    klines_dir = os.path.join(klines_root_dir, prefix)
     return multi_proc_check_one_dir_klines(klines_dir, interval_seconds, start_file_name, max_workers=max_workers)
 
 
-
 if __name__ == "__main__":
-    print(multi_proc_check_one_dir_klines(f"{config.diy_binance_vision_dir}/data/spot/daily/klines/PEPEUSDT/1s", "", 1))
+    print(multi_proc_check_one_symbol_klines(SymbolType.SPOT, "PEPEUSDT", 1))
