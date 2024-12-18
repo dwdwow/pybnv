@@ -54,4 +54,4 @@ def tidy_one_symbol(
         
 
 if __name__ == "__main__":
-    tidy_one_symbol(SymbolType.SPOT, "PEPEUSDT")
+    tidy_one_symbol(SymbolType.SPOT, "BTCUSDT")
