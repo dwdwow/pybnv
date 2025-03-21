@@ -14,6 +14,7 @@ _logger.setLevel(logging.DEBUG)
 
 _decimal_places = 10
 
+micro_20000101 = 946684800000000
 
 def merge_one_file_agg_trades_to_klines(
         interval_seconds: int,
@@ -29,6 +30,14 @@ def merge_one_file_agg_trades_to_klines(
     
     if df is None or df.empty:
         return []
+    
+    first_time = int(df.at[0, "time"])
+    
+    # binance old data is in milliseconds, new data is in microseconds
+    ts_adjust_ratio = 1
+    if first_time > micro_20000101:
+        ts_adjust_ratio = 1000
+        first_time = first_time // ts_adjust_ratio
 
     one_day_ms = 24*60*60*1000
     interval_ms = interval_seconds*1000
@@ -36,8 +45,7 @@ def merge_one_file_agg_trades_to_klines(
     if one_day_ms % interval_ms != 0:
         raise ValueError(f"interval_ms: {interval_ms} is not a divisor of one_day_ms: {one_day_ms}")
 
-    first_time = df.at[0, "time"]
-    start_ms = int(first_time)//one_day_ms*one_day_ms
+    start_ms = first_time//one_day_ms*one_day_ms
     
     kline_num = one_day_ms // interval_ms
     # no use, just for safety
@@ -53,7 +61,7 @@ def merge_one_file_agg_trades_to_klines(
     _logger.debug(f"file: {agg_trade_file_path}, df.shape: {df.shape}, kline_num: {kline_num}, start: {datetime.datetime.fromtimestamp(start_ms//1000, tz=datetime.timezone.utc)}, interval_ms: {interval_ms}")
     
     for row in df.itertuples():
-        time_ms = row.time
+        time_ms = row.time // ts_adjust_ratio
         open_time_ms = (time_ms - start_ms) // interval_ms * interval_ms + start_ms
         quote_asset_volume = row.price * row.qty
         if open_time_ms != kline["openTime"]:
@@ -254,6 +262,6 @@ def _add_leading_missing_klines_and_save(
 
 if __name__ == "__main__":
     syb_type = SymbolType.SPOT
-    symbol = "PEPEUSDT"
-    interval_seconds = 1
+    symbol = "BTCUSDT"
+    interval_seconds = 15
     multi_proc_merge_one_symbol_agg_trades_to_klines(syb_type, symbol, interval_seconds)

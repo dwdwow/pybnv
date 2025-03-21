@@ -7,11 +7,14 @@ from enums import SymbolType
 import raw_downloader
 import raw_unzipper
 
+logging.basicConfig(level=logging.INFO)
 _logger = logging.getLogger(__name__)
 
 def tidy_one_symbol(
         syb_type: SymbolType,
         symbol: str,
+        *,
+        start_date: str = "",  # YYYY-MM-DD
         zip_root_dir: str = config.data_binance_vision_dir,
         unzip_root_dir: str = config.unzip_binance_vision_dir,
         missing_root_dir: str = config.missing_binance_vision_dir,
@@ -31,7 +34,13 @@ def tidy_one_symbol(
     os.makedirs(missing_dir, exist_ok=True)
     os.makedirs(tidy_dir, exist_ok=True)
     
-    raw_downloader.multi_proc_download(prefix, "", zip_dir, max_workers=max_workers)
+    marker = ""
+    if start_date:
+        marker = f"{prefix}/{symbol}-aggTrades-{start_date}.zip"
+        
+    _logger.debug(f"Downloading {symbol} aggTrades", {"start marker": marker})
+    
+    raw_downloader.multi_proc_download(prefix, marker, zip_dir, max_workers=max_workers)
     
     raw_unzipper.multi_proc_unzip_one_dir_files_to_dir(zip_dir, unzip_dir, max_workers=max_workers)
     
@@ -54,4 +63,4 @@ def tidy_one_symbol(
         
 
 if __name__ == "__main__":
-    tidy_one_symbol(SymbolType.SPOT, "BTCUSDT")
+    tidy_one_symbol(SymbolType.SPOT, "BTCUSDT", start_date="2025-03-16")
