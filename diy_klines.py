@@ -4,6 +4,8 @@ import itertools
 import logging
 from multiprocessing import Pool
 import os
+
+import pandas as pd
 from enums import SymbolType
 
 import config
@@ -139,6 +141,116 @@ def merge_one_file_agg_trades_to_klines(
     return klines
 
 
+def agg_trades_to_rolling_klines_and_save(
+        symbol: str,
+        syb_type: SymbolType,
+        trades: pd.DataFrame,
+        interval_seconds: int,
+        date: str,
+        klines_root_dir: str = config.diy_binance_vision_dir,
+        ) -> None:
+
+    if trades is None or trades.empty:
+        return []
+    
+    first_time = int(trades.at[0, "time"])
+    
+    # binance old data is in milliseconds, new data is in microseconds
+    ts_adjust_ratio = 1
+    if first_time > micro_20000101:
+        ts_adjust_ratio = 1000
+        first_time = first_time // ts_adjust_ratio
+
+    one_day_ms = 24*60*60*1000
+    interval_ms = interval_seconds*1000
+    
+    # if one_day_ms % interval_ms != 0:
+    #     raise ValueError(f"interval_ms: {interval_ms} is not a divisor of one_day_ms: {one_day_ms}")
+    
+    klines = []
+    
+    temp_trades = []    
+
+    for row in trades.itertuples():
+        time_ms = row.time // ts_adjust_ratio
+        trade = {
+            "time": time_ms,
+            "price": row.price,
+            "qty": row.qty,
+            "isBuyerMaker": bool(row.isBuyerMaker),
+        }
+        if len(temp_trades) == 0:
+            temp_trades.append(trade)
+            continue
+        first = temp_trades[0]
+        ts_diff = time_ms - first["time"]
+        if ts_diff < interval_ms:
+            temp_trades.append(trade)
+            continue
+        kline = {
+            'openTime': first["time"],
+            'openPrice': first["price"],
+            'highPrice': first["price"],
+            'lowPrice': first["price"],
+            'closePrice': first["price"],
+            'volume': 0,
+            'closeTime': 0,
+            'quoteAssetVolume': 0,
+            'tradesNumber': 0,
+            'takerBuyBaseAssetVolume': 0,
+            'takerBuyQuoteAssetVolume': 0,
+            'unused': 0,
+        }
+        new_temp_trades = []
+        for t in temp_trades:
+            ts = t["time"]
+            p = t["price"]
+            q = t["qty"]
+            quote_asset_volume = p * q
+            if p > kline["highPrice"]:
+                kline["highPrice"] = p
+            if p < kline["lowPrice"]:
+                kline["lowPrice"] = p
+            kline["closePrice"] = p
+            kline["closeTime"] = ts
+            kline["volume"] += q
+            kline["quoteAssetVolume"] += quote_asset_volume
+            kline["tradesNumber"] += 1
+            if not t["isBuyerMaker"]:
+                kline["takerBuyBaseAssetVolume"] += q
+                kline["takerBuyQuoteAssetVolume"] += quote_asset_volume
+            if time_ms - ts < interval_ms:
+                new_temp_trades.append(t)
+        _logger.debug(f"new kline: {datetime.datetime.fromtimestamp(kline['openTime']//1000, tz=datetime.timezone.utc)} ~ {datetime.datetime.fromtimestamp(kline['closeTime']//1000, tz=datetime.timezone.utc)}")
+        klines.append(kline)
+        new_temp_trades.append(trade)
+        temp_trades = new_temp_trades
+            
+    klines_dir = f"{klines_root_dir}/data/{syb_type.value}/daily/rolling_klines/{symbol}/rolling{interval_seconds}s"
+    
+    _save_rolling_klines(klines, symbol, interval_seconds, date, klines_dir)
+    
+    
+def read_agg_trades_to_rolling_klines_and_save(
+        symbol: str,
+        syb_type: SymbolType,
+        interval_seconds: int,
+        date: str, # yyyy-mm-dd
+        *,
+        add_trades_root_dir: str = config.tidy_binance_vision_dir,
+        klines_root_dir: str = config.diy_binance_vision_dir,
+        ) -> None:
+    
+    agg_trades_file_path = f"{add_trades_root_dir}/data/{syb_type.value}/daily/aggTrades/{symbol}/{symbol}-aggTrades-{date}.csv"
+    if not os.path.exists(agg_trades_file_path):
+        raise FileNotFoundError(f"agg trades file not found, {agg_trades_file_path}")
+    
+    with open(agg_trades_file_path, "r") as f:
+        df = csv_util.csv_to_pandas(f, csv_util.agg_trades_headers)
+        
+    agg_trades_to_rolling_klines_and_save(symbol, syb_type, df, interval_seconds, date, klines_root_dir)
+
+
 def multi_proc_merge_one_symbol_agg_trades_to_klines(
         syb_type: SymbolType,
         symbol: str,
@@ -258,10 +370,31 @@ def _add_leading_missing_klines_and_save(
                 kline[k] = _float_formater(v)
             writer.writerow(kline)
     _logger.debug(f"saved klines to {klines_file_path}")
+    
+    
+def _save_rolling_klines(
+        klines: list[dict],
+        symbol: str,
+        interval_seconds: int,
+        date: str,
+        klines_dir: str,
+        ) -> None:
+    os.makedirs(klines_dir, mode=0o777, exist_ok=True)
+    klines_file_path = f"{klines_dir}/{symbol}-rolling{interval_seconds}s-{date}.csv"
+    _logger.debug(f"saving klines to {klines_file_path}")
+    with open(klines_file_path, "w") as f:
+        writer = csv.DictWriter(f, fieldnames=csv_util.klines_headers)
+        writer.writeheader()
+        for kline in klines:
+            for k, v in kline.items():
+                kline[k] = _float_formater(v)
+            writer.writerow(kline)
 
 
 if __name__ == "__main__":
     syb_type = SymbolType.SPOT
     symbol = "BTCUSDT"
-    interval_seconds = 15
-    multi_proc_merge_one_symbol_agg_trades_to_klines(syb_type, symbol, interval_seconds)
+    interval_seconds = 30*60
+    # multi_proc_merge_one_symbol_agg_trades_to_klines(syb_type, symbol, interval_seconds)
+    date = "2025-03-03"
+    read_agg_trades_to_rolling_klines_and_save(symbol, syb_type, interval_seconds, date)

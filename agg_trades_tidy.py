@@ -63,4 +63,4 @@ def tidy_one_symbol(
         
 
 if __name__ == "__main__":
-    tidy_one_symbol(SymbolType.SPOT, "BTCUSDT", start_date="2025-03-16")
+    tidy_one_symbol(SymbolType.SPOT, "BTCUSDT", start_date="2025-03-01")
