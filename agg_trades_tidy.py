@@ -50,7 +50,7 @@ def tidy_one_symbol(
         file_names.sort()
         last_file_name = file_names[-1]
     
-    missing_ids = agg_trades_checker.multi_proc_check_one_dir_consistency(unzip_dir, csv_util.agg_trades_headers, start_file_name=last_file_name, max_workers=max_workers)
+    missing_ids = agg_trades_checker.multi_proc_check_one_dir_consistency(unzip_dir, csv_util.agg_trades_headers, tidy_dir=tidy_dir, start_file_name=last_file_name, max_workers=max_workers)
     
     agg_trades_checker.download_missing_trades_and_save(syb_type, symbol, missing_ids, missing_dir)
     

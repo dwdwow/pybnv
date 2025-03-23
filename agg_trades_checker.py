@@ -66,13 +66,22 @@ def check_one_file_consistency(file_path: str, headers: list[str]) -> tuple[int,
         return start_id, end_id, missing_ids
             
 
-def multi_proc_check_one_dir_consistency(dir_path: str, headers: list[str], start_file_name: str | None = None, max_workers: int = config.max_workers) -> list[int]:
+def multi_proc_check_one_dir_consistency(dir_path: str, headers: list[str], *, tidy_dir: str | None = None, start_file_name: str | None = None, max_workers: int = config.max_workers) -> list[int]:
     infos: list[tuple[int, int, list[int]]] = []
     if start_file_name is None:
         start_file_name = ""
 
     with Pool(processes=max_workers) as pool:
-        infos = pool.starmap(check_one_file_consistency, [(os.path.join(dir_path, name), headers) for name in os.listdir(dir_path) if name.endswith(".csv") and name >= start_file_name])
+        files = []
+        for name in os.listdir(dir_path):
+            if name.endswith(".csv") and name >= start_file_name:
+                if tidy_dir is not None:
+                    tidy_file_path = os.path.join(tidy_dir, name)
+                    if os.path.exists(tidy_file_path):
+                        files.append(tidy_file_path)
+                        continue
+                files.append(os.path.join(dir_path, name))
+        infos = pool.starmap(check_one_file_consistency, [(file, headers) for file in files])
         
     if len(infos) == 0:
         return []
@@ -165,6 +174,8 @@ def group_trades_by_date_save(symbol: str, trades: list[dict], save_dir: str, ch
 
 
 def download_missing_trades_and_save(syb_type: SymbolType, symbol: str, missing_ids: list[int], save_dir: str) -> None:
+    if not missing_ids:
+        return
     trades = download_missing_trades(syb_type, symbol, missing_ids)
     group_trades_by_date_save(symbol, trades, save_dir)
     
@@ -205,6 +216,7 @@ def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str,
     _logger.info(f"Saved merged trades to {os.path.join(save_dir, file_name)}")
     
     clear_file(raw_path)
+    _logger.info(f"Cleared {raw_path}")
     
 
 def multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir: str, missing_dir: str, save_dir: str, check_tidy_file_exists: bool = True, max_workers: int = config.max_workers) -> None:

@@ -13,7 +13,7 @@ def multi_proc_download(prefix: str, marker: str, save_dir: str, check_exists: b
     _logger.debug(f"Found {len(file_paths)} files")
     urls = [f"https://data.binance.vision/{file_path.strip("/")}" for file_path in file_paths]
     _logger.debug(f"Downloading {prefix} {marker} Files")
-    multi_proc_download_save_until_success(urls, save_dir, check_exists, max_workers    )
+    multi_proc_download_save_until_success(urls, save_dir, check_exists, max_workers)
     _logger.debug(f"Downloaded {prefix} {marker} Files")
         
         
