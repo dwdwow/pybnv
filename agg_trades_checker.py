@@ -129,7 +129,7 @@ def download_missing_trades(syb_type: SymbolType, symbol: str, missing_ids: list
     return trades
 
 
-def group_trades_by_date_save(symbol: str, trades: list[dict], save_dir: str, check_file_exists: bool = True) -> None:
+def group_trades_by_date_save(symbol: str, trades: list[dict], save_dir: str, headers: list[str], check_file_exists: bool = True) -> None:
     if not trades:
         return
     
@@ -154,7 +154,7 @@ def group_trades_by_date_save(symbol: str, trades: list[dict], save_dir: str, ch
         # Convert date_trades list to pandas DataFrame
         date_trades_df = pd.DataFrame(date_trades, columns=csv_util.agg_trades_api_data_headers)
         
-        date_trades_df.columns = csv_util.agg_trades_headers.copy()
+        date_trades_df.columns = headers
 
         # If file exists, read existing data and append new trades
         if check_file_exists and os.path.exists(filepath):
@@ -180,7 +180,7 @@ def download_missing_trades_and_save(syb_type: SymbolType, symbol: str, missing_
     group_trades_by_date_save(symbol, trades, save_dir)
     
 
-def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str, save_dir: str, check_tidy_file_exists: bool = True) -> None:
+def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str, save_dir: str, headers: list[str], check_tidy_file_exists: bool = True) -> None:
     os.makedirs(missing_dir, exist_ok=True)
     os.makedirs(save_dir, exist_ok=True)
     tidy_path = os.path.join(save_dir, file_name)
@@ -191,7 +191,7 @@ def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str,
     raw_path = os.path.join(raw_dir, file_name)
     raw_df = None
     with open(raw_path, "r") as f:
-        raw_df = csv_util.csv_to_pandas(f, csv_util.agg_trades_headers)
+        raw_df = csv_util.csv_to_pandas(f, headers)
 
     os.makedirs(save_dir, exist_ok=True)
 
@@ -206,7 +206,7 @@ def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str,
     
     missing_df = None
     with open(missing_path, "r") as f:
-        missing_df = csv_util.csv_to_pandas(f, csv_util.agg_trades_headers)
+        missing_df = csv_util.csv_to_pandas(f, headers)
     
     merged_df = pd.concat([raw_df, missing_df])
     merged_df.sort_values(by="id", inplace=True, key=lambda x: x.astype(int))
@@ -219,17 +219,18 @@ def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str,
     _logger.info(f"Cleared {raw_path}")
     
 
-def multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir: str, missing_dir: str, save_dir: str, check_tidy_file_exists: bool = True, max_workers: int = config.max_workers) -> None:
+def multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir: str, missing_dir: str, save_dir: str, headers: list[str], check_tidy_file_exists: bool = True, max_workers: int = config.max_workers) -> None:
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(missing_dir, exist_ok=True)
     os.makedirs(raw_dir, exist_ok=True)
     with Pool(processes=max_workers) as pool:
-        pool.starmap(merge_raw_and_missing_trades, [(file_name, raw_dir, missing_dir, save_dir, check_tidy_file_exists) for file_name in os.listdir(raw_dir)])
+        pool.starmap(merge_raw_and_missing_trades, [(file_name, raw_dir, missing_dir, save_dir, headers, check_tidy_file_exists) for file_name in os.listdir(raw_dir)])
         
 
 def multi_proc_merge_one_symbol_raw_and_missing_trades(
         syb_type: SymbolType,
         symbol: str,
+        headers: list[str],
         unzip_root_dir: str = config.unzip_binance_vision_dir,
         missing_root_dir: str = config.missing_binance_vision_dir,
         tidy_root_dir: str = config.tidy_binance_vision_dir,
@@ -240,7 +241,7 @@ def multi_proc_merge_one_symbol_raw_and_missing_trades(
     raw_dir = os.path.join(unzip_root_dir, prefix)
     missing_dir = os.path.join(missing_root_dir, prefix)
     save_dir = os.path.join(tidy_root_dir, prefix)
-    multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir, missing_dir, save_dir, check_tidy_file_exists, max_workers)
+    multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir, missing_dir, save_dir, headers, check_tidy_file_exists, max_workers)
     
 
 if __name__ == "__main__":
@@ -260,5 +261,5 @@ if __name__ == "__main__":
         download_missing_trades_and_save(syb_type, symbol, missing_ids, missing_dir_path)
         _logger.info(f"Downloaded {len(missing_ids)} missing trades for {symbol}")
     _logger.info(f"Merging raw and missing trades for {symbol}")
-    multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type, symbol)
+    multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type, symbol, csv_util.agg_trades_headers)
     _logger.info(f"Merged raw and missing trades for {symbol}")
