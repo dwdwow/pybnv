@@ -46,9 +46,10 @@ def clear_dir(dir_path: str) -> None:
     for root, _, files in os.walk(dir_path):
         for file in files:
             file_path = os.path.join(root, file)
-            with open(file_path, 'wb') as f:
-                f.truncate(0)
-            _logger.info(f"Cleared contents of {file_path}")
+            if os.path.isfile(file_path):
+                with open(file_path, 'wb') as f:
+                    f.truncate(0)
+                _logger.info(f"Cleared contents of {file_path}")
     
 
 def multi_proc_unzip_one_dir_files_to_dir(zip_dir: str, save_dir: str, check_exists: bool = True, max_workers: int = config.max_workers) -> None:
