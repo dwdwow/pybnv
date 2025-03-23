@@ -35,13 +35,32 @@ def clear_file(file_path: str) -> None:
     _logger.info(f"Cleared contents of {file_path}")
     
 
+def clear_dir(dir_path: str) -> None:
+    """
+    Clear all files in a directory and its subdirectories without deleting the directories themselves.
+
+    Args:
+        dir_path: Path to the directory to clear
+    """
+    _logger.info(f"Clearing contents of directory {dir_path}")
+    for root, _, files in os.walk(dir_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            with open(file_path, 'wb') as f:
+                f.truncate(0)
+            _logger.info(f"Cleared contents of {file_path}")
+    
+
 def multi_proc_unzip_one_dir_files_to_dir(zip_dir: str, save_dir: str, check_exists: bool = True, max_workers: int = config.max_workers) -> None:
     with Pool(processes=max_workers) as pool:
         pool.starmap(unzip_file_to_dir, [(os.path.join(zip_dir, name), save_dir, check_exists) for name in os.listdir(zip_dir) if name.endswith(".zip")])
         
 
 if __name__ == "__main__":
-    path = "/data/spot/daily/aggTrades/PEPEUSDT"
-    zip_dir = config.data_binance_vision_dir + path
-    save_dir = config.unzip_binance_vision_dir + path
-    multi_proc_unzip_one_dir_files_to_dir(zip_dir, save_dir, check_exists=True)
+    # path = "/data/spot/daily/aggTrades/PEPEUSDT"
+    # zip_dir = config.data_binance_vision_dir + path
+    # save_dir = config.unzip_binance_vision_dir + path
+    # multi_proc_unzip_one_dir_files_to_dir(zip_dir, save_dir, check_exists=True)
+    clear_file(config.data_binance_vision_dir)
+    clear_dir(config.unzip_binance_vision_dir)
+
