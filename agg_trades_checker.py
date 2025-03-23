@@ -9,6 +9,7 @@ import api_downloader
 import config
 import csv_util
 from enums import SymbolType
+from raw_unzipper import clear_file
 
 
 logging.basicConfig(level=logging.INFO)
@@ -202,6 +203,8 @@ def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str,
     merged_df.to_csv(tidy_path, index=False)
 
     _logger.info(f"Saved merged trades to {os.path.join(save_dir, file_name)}")
+    
+    clear_file(raw_path)
     
 
 def multi_proc_merge_one_dir_raw_and_missing_trades(raw_dir: str, missing_dir: str, save_dir: str, check_tidy_file_exists: bool = True, max_workers: int = config.max_workers) -> None:

@@ -19,6 +19,20 @@ def unzip_file_to_dir(file_path: str, save_dir: str, check_exists: bool = True) 
     _logger.info(f"Unzipping {file_path} to {save_path}")
     zipper.unzip_file_save(file_path, save_path)
     _logger.info(f"Unzipped {file_path} to {save_path}")
+    clear_file(file_path)
+
+
+def clear_file(file_path: str) -> None:
+    """
+    Clear the contents of a zip file without deleting the file itself.
+
+    Args:
+        file_path: Path to the zip file to clear
+    """
+    _logger.info(f"Clearing contents of {file_path}")
+    with open(file_path, 'wb') as f:
+        f.truncate(0)
+    _logger.info(f"Cleared contents of {file_path}")
     
 
 def multi_proc_unzip_one_dir_files_to_dir(zip_dir: str, save_dir: str, check_exists: bool = True, max_workers: int = config.max_workers) -> None:
