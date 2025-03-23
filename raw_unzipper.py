@@ -62,6 +62,6 @@ if __name__ == "__main__":
     # zip_dir = config.data_binance_vision_dir + path
     # save_dir = config.unzip_binance_vision_dir + path
     # multi_proc_unzip_one_dir_files_to_dir(zip_dir, save_dir, check_exists=True)
-    clear_file(config.data_binance_vision_dir)
+    clear_dir(config.data_binance_vision_dir)
     clear_dir(config.unzip_binance_vision_dir)
 
