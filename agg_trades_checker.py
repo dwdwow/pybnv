@@ -121,9 +121,9 @@ def download_missing_trades(syb_type: SymbolType, symbol: str, missing_ids: list
         case SymbolType.SPOT:
             f = api_downloader.download_spot_agg_trades_by_ids
         case SymbolType.FUTURES_UM:
-            f = api_downloader.download_futures_um_agg_trades_by_ids
+            f = api_downloader.download_um_futures_agg_trades_by_ids
         case SymbolType.FUTURES_CM:
-            f = api_downloader.download_futures_cm_agg_trades_by_ids
+            f = api_downloader.download_cm_futures_agg_trades_by_ids
     for group in grouped_missing_ids:
         trades.extend(f(symbol, group[0], group[-1]))
     return trades
