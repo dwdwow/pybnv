@@ -62,7 +62,7 @@ def tidy_one_symbol(
     
     agg_trades_checker.download_missing_trades_and_save(syb_type, symbol, missing_ids, missing_dir, agg_trades_header)
     
-    agg_trades_checker.multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type, symbol, max_workers=max_workers)
+    agg_trades_checker.multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type, symbol, agg_trades_header, max_workers=max_workers)
     
     missing_ids = agg_trades_checker.multi_proc_check_one_dir_consistency(tidy_dir, agg_trades_header, start_file_name=last_file_name, max_workers=max_workers)
     
