@@ -173,11 +173,11 @@ def group_trades_by_date_save(symbol: str, trades: list[dict], save_dir: str, he
         return
 
 
-def download_missing_trades_and_save(syb_type: SymbolType, symbol: str, missing_ids: list[int], save_dir: str) -> None:
+def download_missing_trades_and_save(syb_type: SymbolType, symbol: str, missing_ids: list[int], save_dir: str, headers: list[str]) -> None:
     if not missing_ids:
         return
     trades = download_missing_trades(syb_type, symbol, missing_ids)
-    group_trades_by_date_save(symbol, trades, save_dir)
+    group_trades_by_date_save(symbol, trades, save_dir, headers)
     
 
 def merge_raw_and_missing_trades(file_name: str, raw_dir: str, missing_dir: str, save_dir: str, headers: list[str], check_tidy_file_exists: bool = True) -> None:
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     if missing_ids:
         _logger.info(f"Downloading {len(missing_ids)} missing trades for {symbol}")
         missing_dir_path = f"{missing_root_dir}/{prefix}"
-        download_missing_trades_and_save(syb_type, symbol, missing_ids, missing_dir_path)
+        download_missing_trades_and_save(syb_type, symbol, missing_ids, missing_dir_path, csv_util.agg_trades_headers)
         _logger.info(f"Downloaded {len(missing_ids)} missing trades for {symbol}")
     _logger.info(f"Merging raw and missing trades for {symbol}")
     multi_proc_merge_one_symbol_raw_and_missing_trades(syb_type, symbol, csv_util.agg_trades_headers)
