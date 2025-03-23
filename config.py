@@ -49,7 +49,7 @@ diy_binance_vision_dir = os.path.join(work_dir, "diy.binance.vision")
 max_workers = 1
 
 if os.cpu_count() > 1:
-    # 使用4/5的核数
-    max_workers = os.cpu_count() * 4 // 5
+    # 使用9/10的核数
+    max_workers = os.cpu_count() * 9 // 10
 
 logger.debug(f"Max workers: {max_workers}")
