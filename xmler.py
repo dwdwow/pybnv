@@ -45,6 +45,6 @@ def query_vision_xml_file_paths(prefix: str, marker: str = '') -> List[str]:
     return file_paths + other_file_paths
 
 if __name__ == "__main__":
-    file_paths = query_vision_xml_file_paths("data/spot/daily/aggTrades/BTCUSDT/")
+    file_paths = query_vision_xml_file_paths("data/futures/um/daily/klines/BTCUSDT/1m/")
     print(file_paths)
 

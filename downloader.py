@@ -69,11 +69,11 @@ def multi_proc_download_save_until_success(
 if __name__ == "__main__":
     # Just for testing
     urls = [
-        "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2023-11-19.zip",
-        "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2023-11-20.zip",
-        "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2023-11-21.zip",
-        "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2023-11-22.zip",
-        "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2023-11-23.zip",
-        "https://data.binance.vision/data/spot/daily/aggTrades/BTCUSDT/BTCUSDT-aggTrades-2023-11-24.zip"
+        "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-11-19.zip",
+        "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-11-20.zip",
+        "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-11-21.zip",
+        "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-11-22.zip",
+        "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-11-23.zip",
+        "https://data.binance.vision/data/spot/daily/klines/BTCUSDT/1m/BTCUSDT-1m-2023-11-24.zip"
         ]
-    multi_proc_download_save_until_success(urls, config.data_binance_vision_dir + "/data/spot/daily/aggTrades/BTCUSDT/")
+    multi_proc_download_save_until_success(urls, config.data_binance_vision_dir + "/data/spot/daily/klines/BTCUSDT/1m/")

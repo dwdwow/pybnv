@@ -58,10 +58,8 @@ def multi_proc_unzip_one_dir_files_to_dir(zip_dir: str, save_dir: str, check_exi
         
 
 if __name__ == "__main__":
-    # path = "/data/spot/daily/aggTrades/PEPEUSDT"
-    # zip_dir = config.data_binance_vision_dir + path
-    # save_dir = config.unzip_binance_vision_dir + path
-    # multi_proc_unzip_one_dir_files_to_dir(zip_dir, save_dir, check_exists=True)
-    clear_dir(config.data_binance_vision_dir)
-    clear_dir(config.unzip_binance_vision_dir)
+    path = "/data/spot/daily/klines/BTCUSDT/1m"
+    zip_dir = config.data_binance_vision_dir + path
+    save_dir = config.unzip_binance_vision_dir + path
+    multi_proc_unzip_one_dir_files_to_dir(zip_dir, save_dir, check_exists=True)
 

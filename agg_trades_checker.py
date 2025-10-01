@@ -1,4 +1,3 @@
-import csv
 import datetime
 import logging
 from multiprocessing import Pool

@@ -53,6 +53,12 @@ def get_last_row_ignore_header(filename: str) -> str:
     
 
 def csv_to_pandas(file: TextIO, headers: list[str]) -> pd.DataFrame:
+    # Check if file is empty
+    file.seek(0, 2)  # Go to end of file
+    if file.tell() == 0:  # Check if file size is 0
+        file.seek(0)  # Reset position
+        return pd.DataFrame(columns=headers)
+    file.seek(0)  # Reset position for subsequent reads
     has_h = has_header(file)
     frame = None
     if has_h:

@@ -72,9 +72,9 @@ def tidy_one_symbol(
 
 if __name__ == "__main__":
     # coins = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'ADA', 'DOGE', 'PEPE', 'SUI']
-    coins = ['BTC', 'ETH']
+    coins = ['ETH']
     symbols_usdt = [f"{coin}USDT" for coin in coins]
-    symbols_usdc = [f"{coin}USDC" for coin in coins]
-    symbols = symbols_usdt + symbols_usdc
+    # symbols_usdc = [f"{coin}USDC" for coin in coins]
+    symbols = symbols_usdt #+ symbols_usdc
     for symbol in symbols:
-        tidy_one_symbol(SymbolType.FUTURES_UM, symbol)
+        tidy_one_symbol(SymbolType.FUTURES_UM, symbol, start_date="2025-09-05")
