@@ -271,6 +271,9 @@ def merge_raw_and_missing_klines(
     raw_path = os.path.join(raw_dir, file_name)
     with open(raw_path, "r") as f:
         raw_df = csv_to_pandas(f, klines_headers)
+    if raw_df.empty:
+        _logger.warning(f"Raw file {raw_path} is empty, skipping merge and save.")
+        return
     raw_df = tidy_klines_df(raw_df)
         
     missing_path = os.path.join(missing_dir, file_name)
