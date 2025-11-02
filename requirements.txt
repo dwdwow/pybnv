@@ -2,3 +2,4 @@ binance_connector==3.9.0
 binance_futures_connector==4.1.0
 pandas==2.2.3
 Requests==2.32.3
+loguru==0.7.2
