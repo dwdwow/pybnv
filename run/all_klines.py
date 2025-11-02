@@ -13,6 +13,8 @@ async def main():
     umsybs = await public.get_um_symbols()
     cmsybs = await public.get_cm_symbols()
     
+    # U USDT USDC BUSD
+    
     sps = []
     for syb in spsybs:
         if syb.symbol.endswith("USDT"):
