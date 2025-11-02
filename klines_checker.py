@@ -320,7 +320,8 @@ def multi_proc_merge_one_symbol_raw_and_missing_klines(
     if end_date:
         end_file_name = f"{symbol}-{interval}-{end_date}.csv"
     else:
-        end_file_name = f"{symbol}-{interval}-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d')}.csv"
+        tidy_end_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=2)
+        end_file_name = f"{symbol}-{interval}-{tidy_end_date.strftime('%Y-%m-%d')}.csv"
     with Pool(processes=max_workers) as pool:
         pool.starmap(merge_raw_and_missing_klines, [(file_name, raw_dir, missing_dir, save_dir, check_file_exists)
                                                     for file_name in os.listdir(raw_dir) 
