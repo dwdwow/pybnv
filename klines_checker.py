@@ -295,7 +295,7 @@ def merge_raw_and_missing_klines(
     # Drop duplicates based on open time
     merged_df.drop_duplicates(subset="openTime", keep="first", inplace=True)
 
-    merged_df.to_csv(tidy_path, index=False)
+    merged_df.to_parquet(tidy_path)
 
     _logger.info(f"Saved merged klines to {tidy_path}")
     
