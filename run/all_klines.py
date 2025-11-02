@@ -5,7 +5,7 @@ sys.path.append(str(Path(__file__).parent.parent.resolve()))
 
 import asyncio
 from cex.bnc import public
-from pybnv.klines import download, SymbolType  # pyright: ignore[reportMissingImports]
+from klines import download, SymbolType  # pyright: ignore[reportMissingImports]
 
 
 async def main():
