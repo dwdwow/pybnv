@@ -16,6 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 map_interval_ms_to_interval = {
+    1000: "1s",
     60 * 1000: "1m",
     3 * 60 * 1000: "3m",
     300 * 1000: "5m",
@@ -32,6 +33,7 @@ map_interval_ms_to_interval = {
 
 
 map_interval_to_interval_ms = {
+    "1s": 1000,
     "1m": 60 * 1000,
     "3m": 3 * 60 * 1000,
     "5m": 300 * 1000,
