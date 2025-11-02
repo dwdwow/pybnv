@@ -124,10 +124,17 @@ if __name__ == "__main__":
     # for result in results:
     #     print(datetime.datetime.fromtimestamp(result.first_open_time//1000), datetime.datetime.fromtimestamp(result.last_open_time//1000))
     #     print(len(result.invalid_ts))
+    
+    symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+    intervals = ["1s", "1m", "5m", "15m", "30m", "1h", "2h", "4h"]
+    for symbol in symbols:
+        for interval in intervals:
+            download(
+                SymbolType.SPOT, symbol, interval,
+            )
+            if interval != "1s":
+                download(
+                    SymbolType.SPOT, symbol, interval,
+                )
 
-    download(
-        SymbolType.SPOT, "BTCUSDT", "1m",
-    )
-    
-    
     

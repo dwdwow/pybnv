@@ -287,6 +287,9 @@ def merge_raw_and_missing_klines(
     merged_df = pd.concat([raw_df, missing_df])
     merged_df.sort_values(by="openTime", inplace=True)
     
+    # Drop duplicates based on open time
+    merged_df.drop_duplicates(subset="openTime", keep="first", inplace=True)
+
     merged_df.to_csv(tidy_path, index=False)
 
     _logger.info(f"Saved merged klines to {tidy_path}")
