@@ -263,7 +263,8 @@ def merge_raw_and_missing_klines(
     save_dir: str=config.tidy_binance_vision_dir,
     check_file_exists: bool = True
     ) -> None:
-    tidy_path = os.path.join(save_dir, file_name)
+    # save as parquet
+    tidy_path = os.path.join(save_dir, file_name.replace(".csv", ".parquet"))
     if check_file_exists and os.path.exists(tidy_path):
         _logger.info(f"Tidy file {tidy_path} already exists, skipping")
         return
@@ -279,7 +280,7 @@ def merge_raw_and_missing_klines(
     missing_path = os.path.join(missing_dir, file_name)
     if not os.path.exists(missing_path):
         _logger.info(f"No missing klines file for {file_name}, copying raw file to tidy file")
-        raw_df.to_csv(tidy_path, index=False)
+        raw_df.to_parquet(tidy_path, engine="pyarrow")
         _logger.info(f"Saved raw klines to {tidy_path}")
         return
     
@@ -295,8 +296,7 @@ def merge_raw_and_missing_klines(
     # Drop duplicates based on open time
     merged_df.drop_duplicates(subset="openTime", keep="first", inplace=True)
 
-    tidy_path = tidy_path.replace(".csv", ".parquet")
-    merged_df.to_parquet(tidy_path)
+    merged_df.to_parquet(tidy_path, engine="pyarrow")
 
     _logger.info(f"Saved merged klines to {tidy_path}")
     
