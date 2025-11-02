@@ -15,15 +15,18 @@ async def main():
     
     sps = []
     for syb in spsybs:
-        sps.append(syb.symbol)
+        if syb.symbol.endswith("USDT"):
+            sps.append(syb.symbol)
     
     ums = []
     for syb in umsybs:
-        ums.append(syb.symbol)
+        if syb.symbol.endswith("USDT"):
+            ums.append(syb.symbol)
     
     cms = []
     for syb in cmsybs:
-        cms.append(syb.symbol)
+        if syb.symbol.endswith("USDT"):
+            cms.append(syb.symbol)
         
 
     intervals = ["1s", "1m", "5m", "15m", "30m", "1h", "2h", "4h", "12h"]
