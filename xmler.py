@@ -1,6 +1,10 @@
+import time
 import requests
 from typing import List
 import xml.dom.minidom
+import logging
+
+_logger = logging.getLogger(__name__)
 
 def query_vision_xml_file_paths(prefix: str, marker: str = '') -> List[str]:
     """
@@ -18,8 +22,14 @@ def query_vision_xml_file_paths(prefix: str, marker: str = '') -> List[str]:
     """
     prefix = prefix.strip('/') + "/"
     url = f"https://s3-ap-northeast-1.amazonaws.com/data.binance.vision?delimiter=/&prefix={prefix}&marker={marker}"
-    response = requests.get(url)
-    response.raise_for_status()
+    while True:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            break
+        except Exception as e:
+            _logger.error(f"Error querying vision XML: {e}")
+            time.sleep(1)
     
     encoding = response.encoding or 'utf-8'
     content = response.content.decode(encoding)
