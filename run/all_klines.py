@@ -17,17 +17,17 @@ async def main():
     
     sps = []
     for syb in spsybs:
-        if syb.symbol.endswith("USDT"):
+        if syb.tradable and syb.symbol.endswith("USDT"):
             sps.append(syb.symbol)
     
     ums = []
     for syb in umsybs:
-        if syb.symbol.endswith("USDT"):
+        if syb.tradable and syb.symbol.endswith("USDT"):
             ums.append(syb.symbol)
     
     cms = []
     for syb in cmsybs:
-        if syb.symbol.endswith("USDT"):
+        if syb.tradable:
             cms.append(syb.symbol)
         
 
