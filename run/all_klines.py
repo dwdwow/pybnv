@@ -32,11 +32,11 @@ async def main():
         
 
     intervals = ["1s", "1m", "5m", "15m", "30m", "1h", "2h", "4h", "12h"]
-    for symbol in sps:
-        for interval in intervals:
-            download(
-                SymbolType.SPOT, symbol, interval,
-            )
+    # for symbol in sps:
+    #     for interval in intervals:
+    #         download(
+    #             SymbolType.SPOT, symbol, interval,
+    #         )
             
     
     intervals = intervals[1:]
