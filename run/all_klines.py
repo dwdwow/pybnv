@@ -53,6 +53,19 @@ async def main():
             )
 
 
+async def download_one_symbol_klines():
+    symbol = "ZECUSDT"
+    intervals = ["1s", "1m", "5m", "15m", "30m", "1h", "2h", "4h", "12h"]
+    for interval in intervals:
+        await download(
+            SymbolType.SPOT, symbol, interval,
+        )
+        if interval != "1s":
+            await download(
+                SymbolType.FUTURES_UM, symbol, interval,
+            )
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(download_one_symbol_klines())
 
