@@ -119,14 +119,23 @@ def merge_agg_trades_to_klines(
 def merge_one_file_agg_trades_to_klines(
         interval_ms: int,
         agg_trade_file_path: str,
-        ) -> pd.DataFrame:
+        kline_dir: str | None = None,
+        ):
+        
+    _logger.info(f"merging {agg_trade_file_path} to klines")
 
     with open(agg_trade_file_path, "r") as f:
         raw_data = csv_util.csv_to_pandas(f, csv_util.agg_trades_headers)
     
     if raw_data is None or raw_data.empty:
-        return pd.DataFrame(columns=csv_util.klines_headers)
+        _logger.warning(f"no raw data found in {agg_trade_file_path}")
+        return
         
+    if kline_dir is None:
+        kline_dir = f"{config.diy_binance_vision_dir}/data/{syb_type.value}/daily/klines/{symbol}/{interval_ms}ms"
+        
+    os.makedirs(kline_dir, exist_ok=True)
+    
     date = os.path.basename(agg_trade_file_path).strip(".csv").split("-aggTrades-")[-1]
     
     date = datetime.datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
@@ -142,8 +151,14 @@ def merge_one_file_agg_trades_to_klines(
         pre_close_price = float(last_row_str.split(",")[1])
         pre_close_price = round(pre_close_price, DECIMAL_PLACES)
     
-    return merge_agg_trades_to_klines(interval_ms, raw_data, pre_close_price)
+    ks = merge_agg_trades_to_klines(interval_ms, raw_data, pre_close_price)
     
+    _logger.info(f"saving klines to {kline_dir}/{symbol}-{interval_ms}ms-{date.strftime('%Y-%m-%d')}.parquet")
+    
+    file_path = f"{kline_dir}/{symbol}-{interval_ms}ms-{date.strftime('%Y-%m-%d')}.parquet"
+    
+    ks.to_parquet(file_path, engine="pyarrow", index=False)
+
 
 def multi_proc_merge_one_symbol_agg_trades_to_klines(
         syb_type: SymbolType,
@@ -192,24 +207,8 @@ def multi_proc_merge_one_symbol_agg_trades_to_klines(
         
     _logger.info(f"agg_trades_files: {all_agg_trades_file_names[0]} ~ {all_agg_trades_file_names[-1]}")
     
-    kline_dict: dict[str, pd.DataFrame] = {}
-    
     with Pool(max_workers) as p:
-        kss = p.starmap(merge_one_file_agg_trades_to_klines, [(interval_milliseconds, f"{agg_trades_dir}/{fn}") for fn in all_agg_trades_file_names])
-        for ks_df in kss:
-            if ks_df.empty:
-                continue
-            ot = int(ks_df["openTime"].iloc[0])
-            if ot > MICRO_SECONDS_20000101:
-                ot = ot // 1000
-            fdt = datetime.datetime.fromtimestamp(ot//1000, tz=datetime.timezone.utc)
-            kline_dict[fdt.strftime("%Y-%m-%d")] = ks_df
-            
-    for dt, ks_df in kline_dict.items():
-        klines_file_path = f"{klines_dir}/{symbol}-{interval_milliseconds}ms-{dt}.parquet"
-        _logger.debug(f"saving klines to {klines_file_path}")
-        ks_df.to_parquet(klines_file_path, engine="pyarrow", index=False)
-        _logger.debug(f"saved klines to {klines_file_path}")
+        p.starmap(merge_one_file_agg_trades_to_klines, [(interval_milliseconds, f"{agg_trades_dir}/{fn}") for fn in all_agg_trades_file_names])
 
             
 if __name__ == "__main__":
@@ -217,5 +216,5 @@ if __name__ == "__main__":
     symbol = "BTCUSDT"
     interval_milliseconds = 100
     start_date = "2025-01-01"
-    end_date = "2025-01-04"
+    end_date = "2025-12-31"
     multi_proc_merge_one_symbol_agg_trades_to_klines(syb_type, symbol, interval_milliseconds, start_date, end_date)
