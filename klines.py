@@ -134,7 +134,7 @@ if __name__ == "__main__":
             )
             if interval != "1s":
                 download(
-                    SymbolType.SPOT, symbol, interval,
+                    SymbolType.FUTURES_UM, symbol, interval,
                 )
 
     

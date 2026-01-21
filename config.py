@@ -50,6 +50,6 @@ max_workers = 1
 
 if os.cpu_count() > 1:
     # 使用9/10的核数
-    max_workers = os.cpu_count() * 9 // 10
+    max_workers = os.cpu_count() * 2 // 10
 
 logger.debug(f"Max workers: {max_workers}")

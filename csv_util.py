@@ -65,7 +65,8 @@ def csv_to_pandas(file: TextIO, headers: list[str]) -> pd.DataFrame:
         frame = pd.read_csv(file)
     else:
         frame = pd.read_csv(file, header=None)
-    frame.columns = headers.copy()
+    row_count = len(frame.columns)
+    frame.columns = headers.copy()[:row_count]
     return frame
 
 
